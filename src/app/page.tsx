@@ -3,7 +3,7 @@
 import React, { useState, useRef, ChangeEvent, DragEvent, useEffect } from 'react';
 // Image component from next/image might not be strictly needed if you only use canvas and basic elements,
 // but keep it if you plan to add other images later or use the SVG icon below.
-import Image from 'next/image';
+// Removed unused Image import
 
 // Helper function to convert Hex to RGB
 function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
@@ -396,7 +396,6 @@ export default function Home() {
          return () => clearTimeout(timeoutId); // Cleanup timeout on unmount or change
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- pixelateImage is stable if defined outside useEffect
   }, [originalImageSrc, granularity]); // Dependencies: run when image or granularity changes
 
   // Download function
@@ -599,12 +598,67 @@ export default function Home() {
             </div>
           </div>
         )}
+
+        {/* Grid Display Area */}
+        {mappedPixelData && gridDimensions && (
+          <div className="mt-8 p-4 bg-gray-200 rounded shadow-inner overflow-auto">
+            <h3 className="text-lg font-semibold mb-4 text-gray-700">拼豆图案 ({gridDimensions.M} x {gridDimensions.N})</h3>
+            <div
+              className="inline-grid border border-gray-400"
+              style={{
+                gridTemplateColumns: `repeat(${gridDimensions.N}, minmax(0, 1fr))`,
+                // Set a max width to prevent overly large grids from breaking layout
+                maxWidth: '100%',
+                // Calculate aspect ratio for the container itself
+                // aspectRatio: `${gridDimensions.N} / ${gridDimensions.M}` // Can cause layout issues if cells are small
+              }}
+            >
+              {mappedPixelData.flat().map((cell, index) => (
+                <div
+                  key={index}
+                  title={`${cell.key} (${cell.color})`}
+                  className="w-4 h-4 flex items-center justify-center text-xs font-mono leading-none" // Smaller size, flex center
+                  style={{
+                    backgroundColor: cell.color,
+                    color: getContrastColor(cell.color),
+                    // Add a subtle border to each cell
+                    border: '1px solid rgba(0,0,0,0.1)'
+                  }}
+                >
+                  {/* Optionally display the key inside */}
+                   {/* {cell.key} */}
+                </div>
+              ))}
+            </div>
+            {/* Download Buttons */}
+            <div className="mt-4 flex space-x-4">
+              <button
+                  onClick={handleDownloadImage}
+                  className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition duration-150"
+                  disabled={!mappedPixelData}
+              >
+                  下载 PNG 图案
+              </button>
+              <button
+                  onClick={handleDownloadJson}
+                  className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition duration-150"
+                  disabled={!mappedPixelData}
+              >
+                  下载 JSON 数据
+              </button>
+            </div>
+          </div>
+        )}
       </main>
 
       <footer className="w-full max-w-4xl mt-10 mb-6 py-4 text-center text-xs sm:text-sm text-gray-500 border-t border-gray-200">
         <p>拼豆底稿生成器 &copy; {new Date().getFullYear()}</p>
         {/* Optional: Add link to source code or your website */}
-        {/* <p className="mt-1"><a href="#" className="hover:underline">GitHub Repo</a></p> */}
+        <p className="mt-1">
+          <a href="https://github.com/Zippland/perler-beads.git" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline ml-2">
+            在 GitHub 上查看源码
+          </a>
+        </p>
       </footer>
     </div>
   );
