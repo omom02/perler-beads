@@ -602,7 +602,7 @@ export default function Home() {
       </main>
 
       <footer className="w-full max-w-4xl mt-10 mb-6 py-4 text-center text-xs sm:text-sm text-gray-500 border-t border-gray-200">
-        <p>像素画生成器 (拼豆版) &copy; {new Date().getFullYear()}</p>
+        <p>拼豆底稿生成器 &copy; {new Date().getFullYear()}</p>
         {/* Optional: Add link to source code or your website */}
         {/* <p className="mt-1"><a href="#" className="hover:underline">GitHub Repo</a></p> */}
       </footer>
