@@ -522,7 +522,6 @@ export default function Home() {
     const textOffsetY = rowHeight / 2; // Vertical center alignment for text
     const column1X = padding;       // X position for swatch
     const column2X = padding + swatchSize + 10; // X position for Key text
-    const column3X = 150;         // X position for Count text (adjust as needed)
     const canvasWidth = 250;       // Width of the canvas (adjust as needed)
     const canvasHeight = (sortedKeys.length * rowHeight) + (2 * padding); // Calculate total height
 
