@@ -540,7 +540,7 @@ export default function Home() {
                 type="range"
                 id="granularity"
                 min="10"  // Min grid width
-                max="200" // Max grid width
+                max="100" // Max grid width
                 step="1"  // Adjust step as needed
                 value={granularity}
                 onChange={handleGranularityChange}
