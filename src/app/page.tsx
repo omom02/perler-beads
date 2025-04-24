@@ -135,6 +135,27 @@ function getContrastColor(hex: string): string {
     return luma > 0.5 ? '#000000' : '#FFFFFF'; // Dark background -> white text, Light background -> black text
 }
 
+// Helper function for sorting color keys (e.g., A1, A2, A10, B1)
+function sortColorKeys(a: string, b: string): number {
+  const regex = /^([A-Z]+)(\d+)$/;
+  const matchA = a.match(regex);
+  const matchB = b.match(regex);
+
+  if (matchA && matchB) {
+    const prefixA = matchA[1];
+    const numA = parseInt(matchA[2], 10);
+    const prefixB = matchB[1];
+    const numB = parseInt(matchB[2], 10);
+
+    if (prefixA !== prefixB) {
+      return prefixA.localeCompare(prefixB); // Sort by prefix first (A, B, C...)
+    }
+    return numA - numB; // Then sort by number (1, 2, 10...)
+  }
+  // Fallback for keys that don't match the standard pattern (e.g., T1, ZG1)
+  return a.localeCompare(b);
+}
+
 export default function Home() {
   const [originalImageSrc, setOriginalImageSrc] = useState<string | null>(null);
   const [granularity, setGranularity] = useState<number>(50);
@@ -144,6 +165,7 @@ export default function Home() {
   // 新增状态：存储映射后的像素数据 { key: string, color: string (hex) }
   const [mappedPixelData, setMappedPixelData] = useState<{ key: string; color: string }[][] | null>(null);
   const [gridDimensions, setGridDimensions] = useState<{ N: number; M: number } | null>(null);
+  const [colorCounts, setColorCounts] = useState<{ [key: string]: { count: number; color: string } } | null>(null);
 
   // Handle file selection via input click
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -364,6 +386,20 @@ export default function Home() {
       setMappedPixelData(newMappedData);
       setGridDimensions({ N, M }); // 存储网格尺寸
       console.log(`Pixelation complete: ${N}x${M} grid, processed ${processedCells} cells`);
+
+      // --- Add Color Count Logic ---
+      const counts: { [key: string]: { count: number; color: string } } = {};
+      newMappedData.flat().forEach(cell => {
+        if (cell && cell.key) { // Ensure cell and key exist
+          if (!counts[cell.key]) {
+            counts[cell.key] = { count: 0, color: cell.color };
+          }
+          counts[cell.key].count++;
+        }
+      });
+      setColorCounts(counts); // Update the state with the calculated counts
+      console.log("Color counts updated:", counts);
+      // --- End Color Count Logic ---
     };
     img.onerror = (error: Event | string) => {
       console.error("Image loading failed:", error);
@@ -469,31 +505,88 @@ export default function Home() {
     }
   };
 
-  // New function: handleDownloadJson
-  const handleDownloadJson = () => {
-      if (!mappedPixelData || !gridDimensions || gridDimensions.N === 0 || gridDimensions.M === 0) {
-          console.error("下载JSON失败: 映射数据或尺寸无效。");
-          alert("无法下载JSON，数据未生成或无效。");
-          return;
-      }
-      const { N, M } = gridDimensions;
+  // Function to handle downloading color statistics as an IMAGE (PNG)
+  const handleDownloadStatsImage = () => {
+    // Check if colorCounts data is available
+    if (!colorCounts || Object.keys(colorCounts).length === 0) {
+      console.error("下载统计图失败: 颜色统计数据无效。");
+      alert("无法下载统计图，数据未生成或无效。");
+      return;
+    }
 
-      // Create a 2D array of keys only
-      const keyGrid = mappedPixelData.map(row =>
-          row.map(cell => cell?.key || '?') // Get key, default to '?' if cell data is missing
-      );
+    // --- Canvas Drawing Settings ---
+    const sortedKeys = Object.keys(colorCounts).sort(sortColorKeys);
+    const rowHeight = 25;         // Height of each row in pixels
+    const padding = 10;          // Padding around the table
+    const swatchSize = 18;       // Size of the color swatch square
+    const textOffsetY = rowHeight / 2; // Vertical center alignment for text
+    const column1X = padding;       // X position for swatch
+    const column2X = padding + swatchSize + 10; // X position for Key text
+    const column3X = 150;         // X position for Count text (adjust as needed)
+    const canvasWidth = 250;       // Width of the canvas (adjust as needed)
+    const canvasHeight = (sortedKeys.length * rowHeight) + (2 * padding); // Calculate total height
 
-      const jsonString = JSON.stringify(keyGrid, null, 2); // Pretty print JSON
-      const blob = new Blob([jsonString], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
+    // --- Create Canvas and Context ---
+    const canvas = document.createElement('canvas');
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
+    const ctx = canvas.getContext('2d');
+
+    if (!ctx) {
+      console.error("下载失败: 无法创建 Canvas Context。");
+      alert("无法生成统计图。");
+      return;
+    }
+
+    // --- Draw Background ---
+    ctx.fillStyle = '#FFFFFF'; // White background
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+    // --- Draw Header (Optional) ---
+    // ctx.fillStyle = '#333333';
+    // ctx.font = 'bold 14px sans-serif';
+    // ctx.textAlign = 'center';
+    // ctx.fillText('颜色统计', canvasWidth / 2, padding + textOffsetY - (rowHeight / 2)); // Adjust position if header added
+
+    // --- Draw Table Rows ---
+    ctx.font = '13px sans-serif'; // Font for table content
+    ctx.textBaseline = 'middle'; // Align text vertically
+
+    sortedKeys.forEach((key, index) => {
+      const yPos = padding + (index * rowHeight); // Top position of the current row
+      const cellData = colorCounts[key];
+
+      // 1. Draw Color Swatch
+      ctx.fillStyle = cellData.color;
+      ctx.strokeStyle = '#CCCCCC'; // Light gray border for swatch
+      ctx.lineWidth = 1;
+      ctx.fillRect(column1X, yPos + (rowHeight - swatchSize) / 2, swatchSize, swatchSize);
+      ctx.strokeRect(column1X + 0.5, yPos + (rowHeight - swatchSize) / 2 + 0.5, swatchSize-1, swatchSize-1); // Inset border slightly
+
+      // 2. Draw Key Text
+      ctx.fillStyle = '#333333'; // Dark gray text
+      ctx.textAlign = 'left';
+      ctx.fillText(key, column2X, yPos + textOffsetY);
+
+      // 3. Draw Count Text
+      ctx.textAlign = 'right'; // Align count to the right
+      ctx.fillText(`${cellData.count} 颗`, canvasWidth - padding, yPos + textOffsetY); // Draw count near the right edge
+    });
+
+    // --- Generate and Download Image ---
+    try {
+      const dataURL = canvas.toDataURL('image/png');
       const link = document.createElement('a');
-      link.download = `bead-map-${N}x${M}.json`;
-      link.href = url;
+      link.download = `bead-stats.png`; // Set the filename
+      link.href = dataURL;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      URL.revokeObjectURL(url); // Clean up blob URL
-      console.log("JSON map download initiated.");
+      console.log("Statistics image download initiated.");
+    } catch (e) {
+      console.error("下载统计图失败:", e);
+      alert("无法生成统计图下载链接。");
+    }
   };
 
   return (
@@ -534,7 +627,7 @@ export default function Home() {
             {/* Granularity Slider */}
             <div className="w-full max-w-md bg-white p-3 sm:p-4 rounded-lg shadow">
               <label htmlFor="granularity" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                精细度: <span className="font-semibold text-blue-600">{granularity}</span>
+                横轴格子数量: <span className="font-semibold text-blue-600">{granularity}</span>
               </label>
               <input
                 type="range"
@@ -584,18 +677,42 @@ export default function Home() {
                     下载图纸 (带色号)
                   </button>
                   <button
-                    onClick={handleDownloadJson}
-                    disabled={!mappedPixelData}
+                    onClick={handleDownloadStatsImage}
+                    disabled={!colorCounts}
                     className="flex-1 py-2 px-4 bg-purple-600 text-white text-sm sm:text-base rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
-                    下载数据 (JSON)
+                    下载数量表（PNG）
                   </button>
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Color Counts Display Area */}
+        {colorCounts && Object.keys(colorCounts).length > 0 && (
+          <div className="w-full max-w-2xl mt-6 bg-white p-4 rounded-lg shadow">
+            <h3 className="text-lg font-semibold mb-4 text-gray-700 text-center">颜色统计</h3>
+            <ul className="space-y-2 max-h-60 overflow-y-auto pr-2"> {/* Added max height and scroll */}
+              {Object.keys(colorCounts)
+                .sort(sortColorKeys) // Use the custom sort function
+                .map((key) => (
+                  <li key={key} className="flex items-center justify-between text-sm border-b border-gray-200 pb-1">
+                    <div className="flex items-center space-x-2">
+                      <span
+                        className="inline-block w-4 h-4 rounded border border-gray-400"
+                        style={{ backgroundColor: colorCounts[key].color }}
+                        title={`Hex: ${colorCounts[key].color}`} // Add tooltip for hex color
+                      ></span>
+                      <span className="font-mono font-medium text-gray-800">{key}</span>
+                    </div>
+                    <span className="text-gray-600">{colorCounts[key].count} 颗</span>
+                  </li>
+                ))}
+            </ul>
           </div>
         )}
       </main>
