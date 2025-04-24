@@ -559,7 +559,7 @@ export default function Home() {
 
               {/* Visible Canvas for pixelated result */}
               <div className="bg-white p-3 sm:p-4 rounded-lg shadow">
-                <h2 className="text-base sm:text-lg font-medium mb-3 sm:mb-4 text-center text-gray-800">拼豆图纸预览（已匹配Mard色号）</h2>
+                <h2 className="text-base sm:text-lg font-medium mb-3 sm:mb-4 text-center text-gray-800">图纸预览（下载可看色号）</h2>
                 {/* Container to center canvas and provide background */}
                 <div className="flex justify-center mb-3 sm:mb-4 bg-gray-100 p-2 rounded overflow-hidden" style={{ minHeight: '150px' }}>
                   <canvas
