@@ -170,7 +170,7 @@ export default function Home() {
     }
     const selectedKeys = selectedOption.keys;
     const keySet = new Set(selectedKeys);
-    let filteredPalette = fullBeadPalette.filter(color => keySet.has(color.key));
+    const filteredPalette = fullBeadPalette.filter(color => keySet.has(color.key));
     const t1Color = fullBeadPalette.find(p => p.key === 'T1');
     if (t1Color && !keySet.has('T1')) {
         if (!filteredPalette.some(p => p.key === 'T1')) {
