@@ -152,6 +152,7 @@ export default function Home() {
   const [totalBeadCount, setTotalBeadCount] = useState<number>(0); // ++ 添加总数状态 ++
   // ++ 新增: Tooltip 状态 ++
   const [tooltipData, setTooltipData] = useState<{ x: number; y: number; key: string; color: string } | null>(null);
+  const [remapTrigger, setRemapTrigger] = useState(0); // ++ NEW: Trigger for full remap
 
   // ++ Refs for touch handling ++
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -234,7 +235,7 @@ export default function Home() {
       setGridDimensions(null);
       setColorCounts(null);
       setTotalBeadCount(0);
-      // Exclusions are reset in handleFileChange/handleDrop before calling this
+      setRemapTrigger(prev => prev + 1); // Trigger full remap for new image
     };
     reader.onerror = () => {
         console.error("文件读取失败");
@@ -247,6 +248,7 @@ export default function Home() {
   const handleGranularityChange = (event: ChangeEvent<HTMLInputElement>) => {
     const newGranularity = parseInt(event.target.value, 10);
     setGranularity(newGranularity);
+    setRemapTrigger(prev => prev + 1); // Trigger full remap
   };
 
    // Handle palette selection change
@@ -255,6 +257,7 @@ export default function Home() {
      if (paletteOptions[newKey]) {
          setSelectedPaletteKeySet(newKey);
          setExcludedColorKeys(new Set()); // ++ 重置排除列表 ++
+         setRemapTrigger(prev => prev + 1); // Trigger full remap
      } else {
          console.warn(`Attempted to select invalid palette key: ${newKey}. Keeping current selection.`);
      }
@@ -263,6 +266,7 @@ export default function Home() {
   // ++ Add handler for similarity threshold change ++
   const handleSimilarityChange = (event: ChangeEvent<HTMLInputElement>) => {
     setSimilarityThreshold(parseInt(event.target.value, 10));
+    setRemapTrigger(prev => prev + 1); // Trigger full remap
   };
 
   // Core function: Pixelate the image
@@ -525,7 +529,7 @@ export default function Home() {
 
 
       // Update state and counts using mergedData (excluding external)
-      setMappedPixelData(mergedData); // Update state with the final processed data
+      setMappedPixelData(mergedData);
       setGridDimensions({ N, M });
 
       const counts: { [key: string]: { count: number; color: string } } = {};
@@ -586,11 +590,11 @@ export default function Home() {
         // setColorCounts(null);
         // setTotalBeadCount(0);
     }
-  }, [originalImageSrc, granularity, similarityThreshold, activeBeadPalette, excludedColorKeys]);
+  }, [originalImageSrc, granularity, similarityThreshold, selectedPaletteKeySet, remapTrigger, activeBeadPalette]);
 
     // --- Download function (ensure filename includes palette) ---
     const handleDownloadImage = () => {
-        if (!mappedPixelData || !gridDimensions || gridDimensions.N === 0 || gridDimensions.M === 0) {
+        if (!mappedPixelData || !gridDimensions || gridDimensions.N === 0 || gridDimensions.M === 0 || activeBeadPalette.length === 0) {
             console.error("下载失败: 映射数据或尺寸无效。"); alert("无法下载图纸，数据未生成或无效。"); return;
         }
         const { N, M } = gridDimensions;
@@ -654,8 +658,8 @@ export default function Home() {
 
     // --- Download Stats Image function (ensure filename includes palette) ---
     const handleDownloadStatsImage = () => {
-        if (!colorCounts || Object.keys(colorCounts).length === 0) {
-            console.error("下载统计图失败: 颜色统计数据无效。"); alert("无法下载统计图，数据未生成或无效。"); return;
+        if (!colorCounts || Object.keys(colorCounts).length === 0 || activeBeadPalette.length === 0) {
+            console.error("下载统计图失败: 颜色统计数据无效或色板为空。"); alert("无法下载统计图，数据未生成、无效或无可用颜色。"); return;
         }
         const sortedKeys = Object.keys(colorCounts).sort(sortColorKeys);
         const rowHeight = 25; const padding = 10; const swatchSize = 18;
@@ -688,25 +692,70 @@ export default function Home() {
 
     // --- Handler to toggle color exclusion ---
     const handleToggleExcludeColor = (key: string) => {
-        // Add a check: Don't allow excluding if it's the *very last* color shown in the counts
-        const currentUsedKeys = colorCounts ? Object.keys(colorCounts) : [];
-        const nonExcludedUsedKeys = currentUsedKeys.filter(k => !excludedColorKeys.has(k));
+        const currentExcluded = excludedColorKeys;
+        const isExcluding = !currentExcluded.has(key);
 
-        if (nonExcludedUsedKeys.length === 1 && nonExcludedUsedKeys[0] === key && !excludedColorKeys.has(key)) {
-            alert(`不能排除最后一个在图中使用的颜色 (${key})。`);
-            return;
-        }
+        if (isExcluding) {
+            console.log(`Attempting to exclude color: ${key}`);
+            const currentUsedKeys = colorCounts ? Object.keys(colorCounts) : [];
+            const nonExcludedUsedKeys = currentUsedKeys.filter(k => !currentExcluded.has(k));
 
-        setExcludedColorKeys(prev => {
-            const newSet = new Set(prev);
-            if (newSet.has(key)) {
-                newSet.delete(key); // Re-include
-            } else {
-                newSet.add(key); // Exclude
+            if (nonExcludedUsedKeys.length <= 1 && nonExcludedUsedKeys[0] === key) {
+                alert(`不能排除最后一个在图中使用的颜色 (${key})。`); return;
             }
-            console.log("Updated excluded keys:", newSet);
-            return newSet;
-        });
+
+            const nextExcludedKeys = new Set(currentExcluded); nextExcludedKeys.add(key);
+            const currentOption = paletteOptions[selectedPaletteKeySet];
+            const baseKeys = currentOption ? new Set(currentOption.keys) : new Set(allPaletteKeys);
+            const paletteAfterExclusion = fullBeadPalette.filter(color =>
+                baseKeys.has(color.key) && !nextExcludedKeys.has(color.key)
+            );
+
+            if (paletteAfterExclusion.length === 0) {
+                alert(`排除 ${key} 后将没有可用颜色。无法排除。`); return;
+            }
+
+            const excludedColorData = fullBeadPalette.find(p => p.key === key);
+            if (!excludedColorData || !mappedPixelData || !gridDimensions) { /* Error */ return; }
+
+            console.log(`Remapping cells currently using excluded color: ${key}`);
+            // Create a deep copy ONLY if remapping is needed
+            const newMappedData = mappedPixelData.map(row => row.map(cell => ({...cell})));
+            let remappedCount = 0; const { N, M } = gridDimensions;
+
+            for (let j = 0; j < M; j++) { for (let i = 0; i < N; i++) {
+                const cell = newMappedData[j]?.[i];
+                if (cell && !cell.isExternal && cell.key === key) {
+                    const replacementColor = findClosestPaletteColor(excludedColorData.rgb, paletteAfterExclusion);
+                    newMappedData[j][i] = { ...cell, key: replacementColor.key, color: replacementColor.hex };
+                    remappedCount++;
+                }
+            }}
+            console.log(`Remapped ${remappedCount} cells.`);
+
+            // Update states together
+            setExcludedColorKeys(nextExcludedKeys);
+            setMappedPixelData(newMappedData);
+
+            // Recalculate counts
+            const newCounts: { [key: string]: { count: number; color: string } } = {}; let newTotalCount = 0;
+            newMappedData.flat().forEach(cell => { if (cell && cell.key && !cell.isExternal) {
+                if (!newCounts[cell.key]) {
+                    const colorData = fullBeadPalette.find(p => p.key === cell.key);
+                    newCounts[cell.key] = { count: 0, color: colorData?.hex || '#000000' };
+                }
+                newCounts[cell.key].count++; newTotalCount++;
+            }});
+            setColorCounts(newCounts); setTotalBeadCount(newTotalCount);
+            console.log("State updated after exclusion remap.");
+
+        } else {
+            // --- Re-including ---
+            console.log(`Re-including color: ${key}. Triggering full remap.`);
+            const nextExcludedKeys = new Set(currentExcluded); nextExcludedKeys.delete(key);
+            setExcludedColorKeys(nextExcludedKeys); // Update exclusion set first
+            setRemapTrigger(prev => prev + 1); // Then trigger full remap via useEffect
+        }
     };
 
   // --- Tooltip Logic ---
@@ -953,7 +1002,11 @@ export default function Home() {
             </ul>
             {excludedColorKeys.size > 0 && (
                 <button
-                    onClick={() => setExcludedColorKeys(new Set())}
+                    onClick={() => {
+                         console.log("Restoring all excluded colors. Triggering full remap.");
+                         setExcludedColorKeys(new Set()); // Update exclusion set first
+                         setRemapTrigger(prev => prev + 1); // Then trigger full remap
+                    }}
                     className="mt-3 w-full text-xs py-1.5 px-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
                 >
                     恢复所有排除的颜色 ({excludedColorKeys.size})
@@ -964,10 +1017,14 @@ export default function Home() {
         {/* Message if palette becomes empty */}
          {originalImageSrc && activeBeadPalette.length === 0 && excludedColorKeys.size > 0 && (
              <div className="w-full max-w-2xl mt-6 bg-yellow-100 p-4 rounded-lg shadow text-center text-sm text-yellow-800">
-                 当前所有颜色均被排除或所选色板为空。请在上方统计列表中点击恢复部分颜色，或更换色板。
+                 当前可用颜色过少或为空。请在上方统计列表中点击恢复部分颜色，或更换色板。
                  {excludedColorKeys.size > 0 && (
                       <button
-                          onClick={() => setExcludedColorKeys(new Set())}
+                          onClick={() => {
+                                console.log("Restoring all excluded colors from empty message. Triggering full remap.");
+                                setExcludedColorKeys(new Set());
+                                setRemapTrigger(prev => prev + 1);
+                           }}
                           className="mt-2 ml-2 text-xs py-1 px-2 bg-yellow-200 text-yellow-900 rounded hover:bg-yellow-300"
                       >
                           恢复所有 ({excludedColorKeys.size})
