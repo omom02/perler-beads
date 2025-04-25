@@ -1264,7 +1264,7 @@ export default function Home() {
 
               {/* Canvas Preview Container */}
               <div className="bg-white p-3 sm:p-4 rounded-lg shadow">
-                <div className="flex justify-center mb-3 sm:mb-4 bg-gray-100 p-2 rounded overflow-hidden touch-none"
+                <div className="flex justify-center mb-3 sm:mb-4 bg-gray-100 p-2 rounded overflow-hidden"
                      style={{ minHeight: '150px' }}>
                   <canvas
                     ref={pixelatedCanvasRef}
