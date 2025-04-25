@@ -181,7 +181,12 @@ export default function Home() {
 
   // Update active palette based on selection and exclusions
   useEffect(() => {
-    // ... existing useEffect for activeBeadPalette ...
+    const newActiveBeadPalette = fullBeadPalette.filter(color => {
+      const isInSelectedPalette = paletteOptions[selectedPaletteKeySet]?.keys.includes(color.key);
+      const isNotExcluded = !excludedColorKeys.has(color.key);
+      return isInSelectedPalette && isNotExcluded;
+    });
+    setActiveBeadPalette(newActiveBeadPalette);
   }, [selectedPaletteKeySet, excludedColorKeys, remapTrigger]); // ++ 添加 remapTrigger 依赖 ++
 
 
@@ -603,7 +608,7 @@ export default function Home() {
         // setColorCounts(null);
         // setTotalBeadCount(0);
     }
-    // *** REMOVED activeBeadPalette from dependency array ***
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [originalImageSrc, granularity, similarityThreshold, selectedPaletteKeySet, remapTrigger]); // Dependencies controlling full remap
 
     // --- Download function (ensure filename includes palette) ---
