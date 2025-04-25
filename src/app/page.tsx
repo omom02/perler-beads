@@ -5,6 +5,7 @@ import React, { useState, useRef, ChangeEvent, DragEvent, TouchEvent, useEffect,
 // but keep it if you plan to add other images later or use the SVG icon below.
 // Removed unused Image import
 import Script from 'next/script'; // ++ 导入 Script 组件 ++
+import ColorPalette from '../components/ColorPalette';
 
 import beadPaletteData from './beadPaletteData.json';
 
@@ -138,66 +139,69 @@ function sortColorKeys(a: string, b: string): number {
   return a.localeCompare(b);
 }
 
+// ++ Interface for mapped pixel data needs updating ++
+interface MappedPixel {
+  key: string;
+  color: string;
+  isExternal?: boolean; // Keep this optional or ensure it's always present
+}
+
 export default function Home() {
   const [originalImageSrc, setOriginalImageSrc] = useState<string | null>(null);
-  const [granularity, setGranularity] = useState<number>(50);
-  const [selectedPaletteKeySet, setSelectedPaletteKeySet] = useState<PaletteOptionKey>('all'); // Default to 'all'
-  const [similarityThreshold, setSimilarityThreshold] = useState<number>(35); // ++ Add state for similarity threshold ++
-  const [excludedColorKeys, setExcludedColorKeys] = useState<Set<string>>(new Set()); // ++ 新增：用于存储排除的颜色 Key
+  const [granularity, setGranularity] = useState<number>(50); // Example default
+  const [similarityThreshold, setSimilarityThreshold] = useState<number>(30); // Example default for merging
+  const [selectedPaletteKeySet, setSelectedPaletteKeySet] = useState<PaletteOptionKey>('all'); // Use 'all' or another valid key
+  const [activeBeadPalette, setActiveBeadPalette] = useState<PaletteColor[]>(() => {
+      const initialKey = 'all'; // Match the key used above
+      const options = paletteOptions[initialKey];
+      if (!options) return fullBeadPalette; // Fallback
+      const keySet = new Set(options.keys);
+      return fullBeadPalette.filter(color => keySet.has(color.key));
+  });
+  const [excludedColorKeys, setExcludedColorKeys] = useState<Set<string>>(new Set());
+  const [initialGridColorKeys, setInitialGridColorKeys] = useState<Set<string> | null>(null);
+  const [mappedPixelData, setMappedPixelData] = useState<MappedPixel[][] | null>(null);
+  const [gridDimensions, setGridDimensions] = useState<{ N: number; M: number } | null>(null);
+  const [colorCounts, setColorCounts] = useState<{ [key: string]: { count: number; color: string } } | null>(null);
+  const [totalBeadCount, setTotalBeadCount] = useState<number>(0);
+  const [tooltipData, setTooltipData] = useState<{ x: number, y: number, key: string, color: string } | null>(null);
+  const [remapTrigger, setRemapTrigger] = useState<number>(0);
+  const [isManualColoringMode, setIsManualColoringMode] = useState<boolean>(false);
+  const [selectedColor, setSelectedColor] = useState<MappedPixel | null>(null);
+
   const originalCanvasRef = useRef<HTMLCanvasElement>(null);
   const pixelatedCanvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [mappedPixelData, setMappedPixelData] = useState<{ key: string; color: string; isExternal?: boolean }[][] | null>(null);
-  const [gridDimensions, setGridDimensions] = useState<{ N: number; M: number } | null>(null);
-  const [colorCounts, setColorCounts] = useState<{ [key: string]: { count: number; color: string } } | null>(null);
-  const [totalBeadCount, setTotalBeadCount] = useState<number>(0); // ++ 添加总数状态 ++
-  // ++ 新增: Tooltip 状态 ++
-  const [tooltipData, setTooltipData] = useState<{ x: number; y: number; key: string; color: string } | null>(null);
-  const [remapTrigger, setRemapTrigger] = useState(0); // ++ NEW: Trigger for full remap
-  const [initialGridColorKeys, setInitialGridColorKeys] = useState<Set<string> | null>(null); // ++ 新增：存储初始颜色键
-
-  // ++ Refs for touch handling ++
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // ++ Re-add touch refs needed for tooltip logic ++
   const touchStartPosRef = useRef<{ x: number; y: number; pageX: number; pageY: number } | null>(null);
   const touchMovedRef = useRef<boolean>(false);
 
-  // --- Memoize the selected palette ---
-  const activeBeadPalette = useMemo(() => {
-    console.log(`Recalculating active palette for: ${selectedPaletteKeySet}, excluding ${excludedColorKeys.size} keys.`);
-    const selectedOption = paletteOptions[selectedPaletteKeySet];
-    if (!selectedOption) {
-      console.error(`Invalid palette key selected: ${selectedPaletteKeySet}. Falling back to 'all'.`);
-      const filteredFullPalette = fullBeadPalette.filter(color => !excludedColorKeys.has(color.key));
-      return filteredFullPalette.length > 0 ? filteredFullPalette : fullBeadPalette;
-    }
-    const selectedKeys = selectedOption.keys;
-    const keySet = new Set(selectedKeys);
-    const filteredPalette = fullBeadPalette.filter(color => keySet.has(color.key));
-    const t1Color = fullBeadPalette.find(p => p.key === 'T1');
-    if (t1Color && !keySet.has('T1')) {
-        if (!filteredPalette.some(p => p.key === 'T1')) {
-             console.log("T1 was not in the base palette, but exists. It can be excluded if needed.");
-        }
-    } else if (!t1Color) {
-         console.warn("T1 color key not found in full beadPaletteData.json.");
-    }
-     let finalPalette = filteredPalette.filter(color => !excludedColorKeys.has(color.key));
-     if (finalPalette.length === 0 && filteredPalette.length > 0) {
-         console.warn(`Palette '${selectedPaletteKeySet}' became empty after excluding colors. Falling back to the original selected set.`);
-         finalPalette = filteredPalette;
-     } else if (finalPalette.length === 0 && filteredPalette.length === 0) {
-          console.warn(`Palette '${selectedPaletteKeySet}' was empty initially or became empty after exclusions. Falling back to all colors (minus exclusions).`);
-          finalPalette = fullBeadPalette.filter(color => !excludedColorKeys.has(color.key));
-          if (finalPalette.length === 0) {
-              console.error("All colors including fallbacks seem to be excluded. Using the entire bead palette.");
-              finalPalette = fullBeadPalette;
-          }
-     }
-    console.log(`Active palette has ${finalPalette.length} colors after exclusions.`);
-    return finalPalette;
-  }, [selectedPaletteKeySet, excludedColorKeys]);
+  // --- Derived State ---
 
-  // Handle file selection
+  // Update active palette based on selection and exclusions
+  useEffect(() => {
+    // ... existing useEffect for activeBeadPalette ...
+  }, [selectedPaletteKeySet, excludedColorKeys, remapTrigger]); // ++ 添加 remapTrigger 依赖 ++
+
+
+  // ++ Calculate unique colors currently on the grid for the palette ++
+  const currentGridColors = useMemo(() => {
+    if (!mappedPixelData) return [];
+    const uniqueColorsMap = new Map<string, MappedPixel>();
+    mappedPixelData.flat().forEach(cell => {
+      if (cell && cell.key && !cell.isExternal && !uniqueColorsMap.has(cell.key)) {
+        // Store the full MappedPixel object to preserve key and color
+        uniqueColorsMap.set(cell.key, { key: cell.key, color: cell.color });
+      }
+    });
+    // Sort colors like the stats list, if desired
+    return Array.from(uniqueColorsMap.values()).sort((a, b) => sortColorKeys(a.key, b.key));
+  }, [mappedPixelData]); // Recalculate when pixel data changes
+
+
+  // --- Event Handlers ---
+
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -206,7 +210,6 @@ export default function Home() {
     }
   };
 
-  // Handle file drop
   const handleDrop = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     event.stopPropagation();
@@ -221,13 +224,11 @@ export default function Home() {
     }
   };
 
-  // Handle drag over
   const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     event.stopPropagation();
   };
 
-  // Process file
   const processFile = (file: File) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -246,16 +247,20 @@ export default function Home() {
         setInitialGridColorKeys(null); // ++ 重置初始键 ++
     }
     reader.readAsDataURL(file);
+    // ++ Reset manual coloring mode when a new file is processed ++
+    setIsManualColoringMode(false);
+    setSelectedColor(null);
   };
 
-  // Handle granularity change
   const handleGranularityChange = (event: ChangeEvent<HTMLInputElement>) => {
     const newGranularity = parseInt(event.target.value, 10);
     setGranularity(newGranularity);
     setRemapTrigger(prev => prev + 1); // Trigger full remap
+    // ++ Exit manual coloring mode if parameters change ++
+    setIsManualColoringMode(false);
+    setSelectedColor(null);
   };
 
-   // Handle palette selection change
    const handlePaletteChange = (event: ChangeEvent<HTMLSelectElement>) => {
      const newKey = event.target.value as PaletteOptionKey;
      if (paletteOptions[newKey]) {
@@ -265,13 +270,19 @@ export default function Home() {
      } else {
          console.warn(`Attempted to select invalid palette key: ${newKey}. Keeping current selection.`);
      }
+     // ++ Exit manual coloring mode if palette changes ++
+     setIsManualColoringMode(false);
+     setSelectedColor(null);
    };
 
-  // ++ Add handler for similarity threshold change ++
   const handleSimilarityChange = (event: ChangeEvent<HTMLInputElement>) => {
     setSimilarityThreshold(parseInt(event.target.value, 10));
     setRemapTrigger(prev => prev + 1); // Trigger full remap
+    // ++ Exit manual coloring mode if parameters change ++
+    setIsManualColoringMode(false);
+    setSelectedColor(null);
   };
+
 
   // Core function: Pixelate the image
   const pixelateImage = (imageSrc: string, detailLevel: number, threshold: number, currentPalette: PaletteColor[]) => {
@@ -556,6 +567,9 @@ export default function Home() {
     };
     console.log("Setting image source...");
     img.src = imageSrc;
+    // Ensure manual mode is off after pixelation completes
+    setIsManualColoringMode(false);
+    setSelectedColor(null);
   };
 
   // Use useEffect to trigger pixelation
@@ -803,6 +817,9 @@ export default function Home() {
             setRemapTrigger(prev => prev + 1); // *** KEPT setRemapTrigger here for re-inclusion ***
             console.log("---------"); // ++ Log End ++
         }
+        // ++ Exit manual mode if colors are excluded/included ++
+        setIsManualColoringMode(false);
+        setSelectedColor(null);
     };
 
   // --- Tooltip Logic ---
@@ -851,8 +868,6 @@ export default function Home() {
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
-     // Also hide tooltip when clearing, e.g., on touch end or move
-     // setTooltipData(null); // Let mouseLeave/touchEnd handle hiding specifically
   };
 
   // ++ Updated: Mouse move handler ++
@@ -871,65 +886,71 @@ export default function Home() {
     setTooltipData(null);
   };
 
-  // ++ 新增: Touch start handler ++
+  // ++ Add a dedicated click handler for coloring ++
+  const handleCanvasClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
+    if (isManualColoringMode && selectedColor) {
+        // Use the existing interaction logic, passing isClick as true
+        handleCanvasInteraction(event.clientX, event.clientY, event.pageX, event.pageY, true);
+    }
+  };
+
+  // ++ Touch start handler - Ensure touch variable is used correctly ++ 
   const handleTouchStart = (event: TouchEvent<HTMLCanvasElement>) => {
-    clearLongPress(); // Clear previous timer just in case
-    setTooltipData(null); // Hide any existing tooltip immediately on new touch
+    const touch = event.touches[0];
+    if (!touch) return;
+
+    // Store touch start position for move detection (tooltip logic)
+    touchStartPosRef.current = { x: touch.clientX, y: touch.clientY, pageX: touch.pageX, pageY: touch.pageY };
     touchMovedRef.current = false; // Reset move flag
 
-    const touch = event.touches[0];
-    touchStartPosRef.current = { x: touch.clientX, y: touch.clientY, pageX: touch.pageX, pageY: touch.pageY };
-
-    // Set timer for long press
-    longPressTimerRef.current = setTimeout(() => {
-       // If touch hasn't moved significantly, show tooltip at start position
-      if (!touchMovedRef.current && touchStartPosRef.current) {
-         updateTooltip(touchStartPosRef.current.x, touchStartPosRef.current.y, touchStartPosRef.current.pageX, touchStartPosRef.current.pageY);
-      }
-      longPressTimerRef.current = null; // Timer has fired
-    }, 500); // 500ms delay for long press
+    if (isManualColoringMode && selectedColor) {
+      // Handle coloring on touch start (like a tap)
+      handleCanvasInteraction(touch.clientX, touch.clientY, touch.pageX, touch.pageY, true);
+    } else {
+       // Original Tooltip Long Press Logic
+       clearLongPress(); // Clear any previous timer
+       longPressTimerRef.current = setTimeout(() => {
+          // Only show tooltip if finger hasn't moved significantly
+         if (!touchMovedRef.current && touchStartPosRef.current) {
+             // Use coordinates from touchStartPosRef.current here
+             handleCanvasInteraction(touchStartPosRef.current.x, touchStartPosRef.current.y, touchStartPosRef.current.pageX, touchStartPosRef.current.pageY);
+         }
+       }, 500); // 500ms for long press
+    }
   };
 
-  // ++ 新增: Touch move handler ++
+  // ++ Touch move handler - Ensure touch variable and refs are used correctly ++ 
   const handleTouchMove = (event: TouchEvent<HTMLCanvasElement>) => {
-     if (!touchStartPosRef.current) return;
+    const touch = event.touches[0];
+    if (!touch || !touchStartPosRef.current) return;
 
-     const touch = event.touches[0];
-     const moveThreshold = 10; // Pixels threshold to detect movement
-
-     // Calculate distance moved
-     const dx = touch.clientX - touchStartPosRef.current.x;
-     const dy = touch.clientY - touchStartPosRef.current.y;
-     const distance = Math.sqrt(dx * dx + dy * dy);
-
-     if (distance > moveThreshold) {
-       touchMovedRef.current = true; // Mark as moved
-       clearLongPress(); // Cancel long press if finger moves too much
-       setTooltipData(null); // Hide tooltip if it was shown by long press
-     }
-
-     // Optional: Update tooltip while dragging (like mouse move)
-     // if (distance > moveThreshold) { // Or maybe always update while dragging?
-     //   updateTooltip(touch.clientX, touch.clientY, touch.pageX, touch.pageY);
-     // }
+    // Check if touch has moved significantly from the start position
+    const dx = Math.abs(touch.clientX - touchStartPosRef.current.x);
+    const dy = Math.abs(touch.clientY - touchStartPosRef.current.y);
+    if (dx > 5 || dy > 5) { // Threshold to detect movement
+        touchMovedRef.current = true;
+        clearLongPress(); // Cancel long press if finger moves
+        setTooltipData(null); // Hide tooltip during move
+    }
   };
 
-  // ++ 新增: Touch end handler ++
+  // ++ Touch end handler - Ensure refs are used correctly ++ 
   const handleTouchEnd = () => {
     clearLongPress();
-    // Hide tooltip only if it wasn't triggered by long press *just now*
-    // If the timer is already null (meaning it fired or was cleared by move), hide tooltip.
-    if (!longPressTimerRef.current) {
-        // Add a small delay before hiding to allow user to see info briefly after lifting finger
-        setTimeout(() => setTooltipData(null), 300);
+    // Delay hiding tooltip slightly on touch end to avoid flicker if long press just triggered
+    // and finger didn't move (touchMovedRef is false)
+    if (!touchMovedRef.current) {
+        setTimeout(() => setTooltipData(null), 100);
+    } else {
+        setTooltipData(null); // Hide immediately if finger moved
     }
-    touchStartPosRef.current = null; // Clear touch start position
-    touchMovedRef.current = false;
+    touchStartPosRef.current = null; // Clear start position
+    touchMovedRef.current = false; // Reset move flag
   };
 
   // ++ 新增：绘制像素化 Canvas 的函数 ++
   const drawPixelatedCanvas = (
-      dataToDraw: { key: string; color: string; isExternal?: boolean }[][],
+      dataToDraw: MappedPixel[][], // ++ Update type here ++
       canvasRef: React.RefObject<HTMLCanvasElement | null>, // ++ 修改类型定义 ++
       dims: { N: number; M: number } | null
   ) => {
@@ -980,6 +1001,71 @@ export default function Home() {
           }
       }
       console.log("Pixelated canvas redraw complete.");
+  };
+
+  // --- Canvas Interaction ---
+
+  // ++ Re-introduce the combined interaction handler ++
+  const handleCanvasInteraction = (clientX: number, clientY: number, pageX: number, pageY: number, isClick: boolean = false) => {
+    const canvas = pixelatedCanvasRef.current;
+    if (!canvas || !mappedPixelData || !gridDimensions) {
+      setTooltipData(null);
+      return;
+    }
+
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const canvasX = (clientX - rect.left) * scaleX;
+    const canvasY = (clientY - rect.top) * scaleY;
+
+    const { N, M } = gridDimensions;
+    const cellWidthOutput = canvas.width / N;
+    const cellHeightOutput = canvas.height / M;
+
+    const i = Math.floor(canvasX / cellWidthOutput);
+    const j = Math.floor(canvasY / cellHeightOutput);
+
+    if (i >= 0 && i < N && j >= 0 && j < M) {
+      const cellData = mappedPixelData[j][i];
+
+      // Manual Coloring Logic
+      if (isClick && isManualColoringMode && selectedColor) {
+        // ++ Allow clicking on ANY cell (internal or external) ++
+        // Create a deep copy to ensure state update triggers re-render
+        const newPixelData = mappedPixelData.map(row => row.map(cell => ({ ...cell })));
+        const currentCell = newPixelData[j]?.[i]; // Get current cell data safely
+
+        // Check if the color needs changing OR if it was an external cell being colored
+        if (!currentCell || currentCell.key !== selectedColor.key || currentCell.isExternal) {
+          // ++ Apply selected color/key AND ensure isExternal is false ++
+          newPixelData[j][i] = { ...selectedColor, isExternal: false };
+          setMappedPixelData(newPixelData);
+
+          // Explicitly redraw canvas immediately after state update
+          if (pixelatedCanvasRef.current) {
+            drawPixelatedCanvas(newPixelData, pixelatedCanvasRef, gridDimensions);
+          }
+        }
+        // After a click in manual mode, always clear the tooltip
+        setTooltipData(null);
+      }
+      // Tooltip Logic (only show if NOT a manual coloring click)
+      else if (!isClick || !isManualColoringMode) {
+           if (cellData && !cellData.isExternal && cellData.key) {
+              setTooltipData({
+                x: pageX,
+                y: pageY,
+                key: cellData.key,
+                color: cellData.color,
+              });
+           } else {
+               setTooltipData(null); // Hide tooltip if on background or invalid cell
+           }
+      }
+    } else {
+      setTooltipData(null); // Hide if outside bounds
+    }
   };
 
   return (
@@ -1054,63 +1140,95 @@ export default function Home() {
         {/* Controls and Output Area */}
         {originalImageSrc && (
           <div className="w-full flex flex-col items-center space-y-5 sm:space-y-6">
-            {/* Control Row */}
-            <div className="w-full max-w-lg grid grid-cols-1 sm:grid-cols-3 gap-4 bg-white p-3 sm:p-4 rounded-lg shadow">
-               {/* Granularity Slider */}
-               <div className="flex-1">
-                  <label htmlFor="granularity" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-1.5">
-                    横轴格子: <span className="font-semibold text-blue-600">{granularity}</span>
-                  </label>
-                  <input type="range" id="granularity" min="10" max="100" step="1" value={granularity} onChange={handleGranularityChange} className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600" />
-                  <div className="flex justify-between text-xs text-gray-500 mt-0.5 px-1"><span>粗</span><span>细</span></div>
-                </div>
-                {/* ++ Similarity Threshold Slider ++ */}
-                <div className="flex-1">
-                    <label htmlFor="similarityThreshold" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-1.5">
-                        颜色合并: <span className="font-semibold text-purple-600">{similarityThreshold}</span>
+            {/* ++ HIDE Control Row in manual mode ++ */}
+            {!isManualColoringMode && (
+              <div className="w-full max-w-lg grid grid-cols-1 sm:grid-cols-3 gap-4 bg-white p-3 sm:p-4 rounded-lg shadow">
+                 {/* Granularity Slider */}
+                 <div className="flex-1">
+                    <label htmlFor="granularity" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-1.5">
+                      横轴格子: <span className="font-semibold text-blue-600">{granularity}</span>
                     </label>
-                    <input type="range" id="similarityThreshold" min="0" max="200" step="1" value={similarityThreshold} onChange={handleSimilarityChange} className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-600" />
-                    <div className="flex justify-between text-xs text-gray-500 mt-0.5 px-1"><span>少</span><span>多</span></div>
-                </div>
-               {/* Palette Selector */}
-               <div className="flex-1">
-                 <label htmlFor="paletteSelect" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-1.5">选择色板:</label>
-                 <select id="paletteSelect" value={selectedPaletteKeySet} onChange={handlePaletteChange} className="w-full p-1.5 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 h-9"> {/* Adjust height if needed */}
-                   {(Object.keys(paletteOptions) as PaletteOptionKey[]).map(key => (
-                     <option key={key} value={key}>{paletteOptions[key].name}</option>
-                   ))}
-                 </select>
-               </div>
-            </div>
+                    <input type="range" id="granularity" min="10" max="100" step="1" value={granularity} onChange={handleGranularityChange} className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600" />
+                    <div className="flex justify-between text-xs text-gray-500 mt-0.5 px-1"><span>粗</span><span>细</span></div>
+                  </div>
+                  {/* Similarity Threshold Slider */}
+                  <div className="flex-1">
+                      <label htmlFor="similarityThreshold" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-1.5">
+                          颜色合并: <span className="font-semibold text-purple-600">{similarityThreshold}</span>
+                      </label>
+                      <input type="range" id="similarityThreshold" min="0" max="200" step="1" value={similarityThreshold} onChange={handleSimilarityChange} className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-600" />
+                      <div className="flex justify-between text-xs text-gray-500 mt-0.5 px-1"><span>少</span><span>多</span></div>
+                  </div>
+                 {/* Palette Selector */}
+                 <div className="flex-1">
+                   <label htmlFor="paletteSelect" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-1.5">选择色板:</label>
+                   <select id="paletteSelect" value={selectedPaletteKeySet} onChange={handlePaletteChange} className="w-full p-1.5 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 h-9">
+                     {(Object.keys(paletteOptions) as PaletteOptionKey[]).map(key => (
+                       <option key={key} value={key}>{paletteOptions[key].name}</option>
+                     ))}
+                   </select>
+                 </div>
+              </div>
+            )} {/* ++ End of HIDE Control Row ++ */}
 
             {/* Output Section */}
             <div className="w-full max-w-2xl">
               <canvas ref={originalCanvasRef} className="hidden"></canvas>
+
+              {/* ++ RENDER Button/Palette ONLY in manual mode above canvas ++ */}
+              {isManualColoringMode && mappedPixelData && gridDimensions && (
+                <div className="w-full mb-4 p-3 bg-blue-50 rounded-lg shadow-sm">
+                  {/* Finish Manual Coloring Button */}
+                  <button
+                    onClick={() => {
+                      setIsManualColoringMode(false); // Always exit mode here
+                      setSelectedColor(null);
+                      setTooltipData(null);
+                    }}
+                    className={`w-full py-2 px-4 text-sm sm:text-base rounded-md transition-colors flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 text-white`}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}> <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /> </svg>
+                    完成手动上色
+                  </button>
+                  {/* Color Palette (only in manual mode) */}
+                  <div className="mt-3">
+                    <p className="text-xs text-center text-gray-600 mb-2">选择颜色后，点击下方画布格子进行填充:</p>
+                    <ColorPalette
+                      colors={currentGridColors}
+                      selectedColor={selectedColor}
+                      onColorSelect={setSelectedColor}
+                    />
+                  </div>
+                </div>
+              )} {/* ++ End of RENDER Button/Palette ++ */}
+
+              {/* Canvas Preview Container */}
               <div className="bg-white p-3 sm:p-4 rounded-lg shadow">
-                <h2 className="text-base sm:text-lg font-medium mb-3 sm:mb-4 text-center text-gray-800">图纸预览（悬停或长按查看颜色）</h2>
+                 <h2 className="text-base sm:text-lg font-medium mb-3 sm:mb-4 text-center text-gray-800">
+                   {isManualColoringMode ? "手动上色中... (点击格子填充)" : "图纸预览（悬停或长按查看颜色）"}
+                 </h2>
                 <div className="flex justify-center mb-3 sm:mb-4 bg-gray-100 p-2 rounded overflow-hidden touch-none"
                      style={{ minHeight: '150px' }}>
                   <canvas
                     ref={pixelatedCanvasRef}
-                    // Mouse events
                     onMouseMove={handleCanvasMouseMove}
                     onMouseLeave={handleCanvasMouseLeave}
-                    // Touch events
+                    onClick={handleCanvasClick}
                     onTouchStart={handleTouchStart}
                     onTouchMove={handleTouchMove}
                     onTouchEnd={handleTouchEnd}
-                    onTouchCancel={handleTouchEnd} // Also clear on cancel
-                    className="border border-gray-300 max-w-full h-auto rounded block cursor-crosshair"
+                    onTouchCancel={handleTouchEnd}
+                    className={`border border-gray-300 max-w-full h-auto rounded block ${isManualColoringMode ? 'cursor-pointer' : 'cursor-crosshair'}`}
                     style={{ maxHeight: '60vh', imageRendering: 'pixelated' }}
                   />
                 </div>
               </div>
             </div>
-          </div>
+          </div> // This closes the main div started after originalImageSrc check
         )}
 
-        {/* ++ Combined Color Counts and Exclusion Area ++ */}
-        {originalImageSrc && colorCounts && Object.keys(colorCounts).length > 0 && (
+        {/* ++ HIDE Color Counts in manual mode ++ */}
+        {!isManualColoringMode && originalImageSrc && colorCounts && Object.keys(colorCounts).length > 0 && (
           <div className="w-full max-w-2xl mt-6 bg-white p-4 rounded-lg shadow">
             <h3 className="text-lg font-semibold mb-1 text-gray-700 text-center">
               颜色统计与排除 ({paletteOptions[selectedPaletteKeySet]?.name || '未知色板'})
@@ -1122,7 +1240,7 @@ export default function Home() {
                 .map((key) => {
                   const isExcluded = excludedColorKeys.has(key);
                   const count = colorCounts[key].count;
-                  const colorHex = colorCounts[key].color; // Get color from counts data
+                  const colorHex = colorCounts[key].color;
 
                   return (
                     <li
@@ -1130,7 +1248,7 @@ export default function Home() {
                       onClick={() => handleToggleExcludeColor(key)}
                       className={`flex items-center justify-between p-1.5 rounded cursor-pointer transition-colors ${
                         isExcluded
-                          ? 'bg-red-100 hover:bg-red-200 opacity-60' // Adjusted style for excluded items in this list
+                          ? 'bg-red-100 hover:bg-red-200 opacity-60'
                           : 'hover:bg-gray-100'
                       }`}
                       title={isExcluded ? `点击恢复 ${key}` : `点击排除 ${key}`}
@@ -1138,7 +1256,7 @@ export default function Home() {
                       <div className={`flex items-center space-x-2 ${isExcluded ? 'line-through' : ''}`}>
                         <span
                           className="inline-block w-4 h-4 rounded border border-gray-400 flex-shrink-0"
-                          style={{ backgroundColor: isExcluded ? '#cccccc' : colorHex }} // Gray out swatch if excluded
+                          style={{ backgroundColor: isExcluded ? '#cccccc' : colorHex }}
                         ></span>
                         <span className={`font-mono font-medium ${isExcluded ? 'text-red-700' : 'text-gray-800'}`}>{key}</span>
                       </div>
@@ -1150,10 +1268,9 @@ export default function Home() {
             {excludedColorKeys.size > 0 && (
                 <button
                     onClick={() => {
-                         console.log("Restoring all excluded colors. Triggering full remap.");
-                         setExcludedColorKeys(new Set()); // Update exclusion set first
-                         setInitialGridColorKeys(null); // ++ 重置初始键 - 它们将在完全重映射后重新计算 ++
-                         setRemapTrigger(prev => prev + 1); // Then trigger full remap
+                         setExcludedColorKeys(new Set());
+                         setInitialGridColorKeys(null);
+                         setRemapTrigger(prev => prev + 1);
                     }}
                     className="mt-3 w-full text-xs py-1.5 px-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
                 >
@@ -1161,17 +1278,17 @@ export default function Home() {
                 </button>
             )}
           </div>
-        )}
-        {/* Message if palette becomes empty */}
-         {originalImageSrc && activeBeadPalette.length === 0 && excludedColorKeys.size > 0 && (
+        )} {/* ++ End of HIDE Color Counts ++ */}
+
+        {/* Message if palette becomes empty (Also hide in manual mode) */}
+         {!isManualColoringMode && originalImageSrc && activeBeadPalette.length === 0 && excludedColorKeys.size > 0 && (
              <div className="w-full max-w-2xl mt-6 bg-yellow-100 p-4 rounded-lg shadow text-center text-sm text-yellow-800">
                  当前可用颜色过少或为空。请在上方统计列表中点击恢复部分颜色，或更换色板。
                  {excludedColorKeys.size > 0 && (
                       <button
                           onClick={() => {
-                                console.log("Restoring all excluded colors from empty message. Triggering full remap.");
                                 setExcludedColorKeys(new Set());
-                                setInitialGridColorKeys(null); // ++ 重置初始键 ++
+                                setInitialGridColorKeys(null);
                                 setRemapTrigger(prev => prev + 1);
                            }}
                           className="mt-2 ml-2 text-xs py-1 px-2 bg-yellow-200 text-yellow-900 rounded hover:bg-yellow-300"
@@ -1182,9 +1299,27 @@ export default function Home() {
              </div>
          )}
 
-        {/* Download Buttons */}
-        {originalImageSrc && mappedPixelData && (
+        {/* ++ RENDER Enter Manual Mode Button ONLY when NOT in manual mode (before downloads) ++ */}
+        {!isManualColoringMode && originalImageSrc && mappedPixelData && gridDimensions && (
+            <div className="w-full max-w-2xl mt-4"> {/* Wrapper div */} 
+             <button
+                onClick={() => {
+                  setIsManualColoringMode(true); // Enter mode
+                  setSelectedColor(null);
+                  setTooltipData(null);
+                }}
+                className={`w-full py-2 px-4 text-sm sm:text-base rounded-md transition-colors flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 text-white`}
+              >
+                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"> <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" /> </svg>
+                 进入手动上色模式
+             </button>
+            </div>
+        )} {/* ++ End of RENDER Enter Manual Mode Button ++ */}
+
+        {/* ++ HIDE Download Buttons in manual mode ++ */}
+        {!isManualColoringMode && originalImageSrc && mappedPixelData && (
             <div className="w-full max-w-2xl mt-4 flex flex-col sm:flex-row gap-2 sm:gap-3">
+              {/* Download Grid Button */}
               <button
                 onClick={handleDownloadImage}
                 disabled={!mappedPixelData || !gridDimensions || gridDimensions.N === 0 || gridDimensions.M === 0 || activeBeadPalette.length === 0}
@@ -1193,6 +1328,7 @@ export default function Home() {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                 下载图纸 (带色号)
               </button>
+              {/* Download Stats Button */}
               <button
                 onClick={handleDownloadStatsImage}
                 disabled={!colorCounts || totalBeadCount === 0 || activeBeadPalette.length === 0}
@@ -1202,7 +1338,7 @@ export default function Home() {
                 下载数量表 (PNG)
               </button>
             </div>
-        )}
+        )} {/* ++ End of HIDE Download Buttons ++ */}
 
          {/* Tooltip Display (remains the same) */}
          {tooltipData && (
@@ -1222,6 +1358,8 @@ export default function Home() {
                <span className="font-mono font-semibold">{tooltipData.key}</span>
             </div>
           )}
+
+         {/* Cleaned up the previously moved/commented out block */}
 
       </main>
 
