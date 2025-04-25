@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, ChangeEvent, DragEvent, useEffect, useMemo } from 'react';
+import React, { useState, useRef, ChangeEvent, DragEvent, TouchEvent, useEffect, useMemo } from 'react';
 // Image component from next/image might not be strictly needed if you only use canvas and basic elements,
 // but keep it if you plan to add other images later or use the SVG icon below.
 // Removed unused Image import
@@ -142,6 +142,7 @@ export default function Home() {
   const [granularity, setGranularity] = useState<number>(50);
   const [selectedPaletteKeySet, setSelectedPaletteKeySet] = useState<PaletteOptionKey>('all'); // Default to 'all'
   const [similarityThreshold, setSimilarityThreshold] = useState<number>(35); // ++ Add state for similarity threshold ++
+  const [excludedColorKeys, setExcludedColorKeys] = useState<Set<string>>(new Set()); // ++ 新增：用于存储排除的颜色 Key
   const originalCanvasRef = useRef<HTMLCanvasElement>(null);
   const pixelatedCanvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -149,47 +150,55 @@ export default function Home() {
   const [gridDimensions, setGridDimensions] = useState<{ N: number; M: number } | null>(null);
   const [colorCounts, setColorCounts] = useState<{ [key: string]: { count: number; color: string } } | null>(null);
   const [totalBeadCount, setTotalBeadCount] = useState<number>(0); // ++ 添加总数状态 ++
+  // ++ 新增: Tooltip 状态 ++
+  const [tooltipData, setTooltipData] = useState<{ x: number; y: number; key: string; color: string } | null>(null);
+
+  // ++ Refs for touch handling ++
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const touchStartPosRef = useRef<{ x: number; y: number; pageX: number; pageY: number } | null>(null);
+  const touchMovedRef = useRef<boolean>(false);
 
   // --- Memoize the selected palette ---
   const activeBeadPalette = useMemo(() => {
-    console.log(`Recalculating active palette for: ${selectedPaletteKeySet}`);
+    console.log(`Recalculating active palette for: ${selectedPaletteKeySet}, excluding ${excludedColorKeys.size} keys.`);
     const selectedOption = paletteOptions[selectedPaletteKeySet];
     if (!selectedOption) {
-        console.error(`Invalid palette key selected: ${selectedPaletteKeySet}. Falling back to 'all'.`);
-        setSelectedPaletteKeySet('all'); // Reset to default if key is invalid
-        return fullBeadPalette;
+      console.error(`Invalid palette key selected: ${selectedPaletteKeySet}. Falling back to 'all'.`);
+      const filteredFullPalette = fullBeadPalette.filter(color => !excludedColorKeys.has(color.key));
+      return filteredFullPalette.length > 0 ? filteredFullPalette : fullBeadPalette;
     }
     const selectedKeys = selectedOption.keys;
     const keySet = new Set(selectedKeys);
-
-    const filteredPalette = fullBeadPalette.filter(color => keySet.has(color.key));
-
-    // Ensure T1 (white) is always included if it exists in the full data
+    let filteredPalette = fullBeadPalette.filter(color => keySet.has(color.key));
     const t1Color = fullBeadPalette.find(p => p.key === 'T1');
     if (t1Color && !keySet.has('T1')) {
         if (!filteredPalette.some(p => p.key === 'T1')) {
-            filteredPalette.push(t1Color);
-            console.log("Added T1 to the active palette as it was missing.");
+             console.log("T1 was not in the base palette, but exists. It can be excluded if needed.");
         }
     } else if (!t1Color) {
-         console.warn("T1 color key not found in full beadPaletteData.json. Fallback for empty cells might use another white or the first palette color.");
+         console.warn("T1 color key not found in full beadPaletteData.json.");
     }
-
-
-     if (filteredPalette.length === 0) {
-         console.warn(`Palette '${selectedPaletteKeySet}' resulted in an empty set (even after T1 check). Falling back to all colors.`);
-         return fullBeadPalette; // Fallback if still empty
+     let finalPalette = filteredPalette.filter(color => !excludedColorKeys.has(color.key));
+     if (finalPalette.length === 0 && filteredPalette.length > 0) {
+         console.warn(`Palette '${selectedPaletteKeySet}' became empty after excluding colors. Falling back to the original selected set.`);
+         finalPalette = filteredPalette;
+     } else if (finalPalette.length === 0 && filteredPalette.length === 0) {
+          console.warn(`Palette '${selectedPaletteKeySet}' was empty initially or became empty after exclusions. Falling back to all colors (minus exclusions).`);
+          finalPalette = fullBeadPalette.filter(color => !excludedColorKeys.has(color.key));
+          if (finalPalette.length === 0) {
+              console.error("All colors including fallbacks seem to be excluded. Using the entire bead palette.");
+              finalPalette = fullBeadPalette;
+          }
      }
-
-
-    console.log(`Active palette has ${filteredPalette.length} colors.`);
-    return filteredPalette;
-  }, [selectedPaletteKeySet]);
+    console.log(`Active palette has ${finalPalette.length} colors after exclusions.`);
+    return finalPalette;
+  }, [selectedPaletteKeySet, excludedColorKeys]);
 
   // Handle file selection
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      setExcludedColorKeys(new Set()); // ++ 重置排除列表 ++
       processFile(file);
     }
   };
@@ -201,6 +210,7 @@ export default function Home() {
     if (event.dataTransfer.files && event.dataTransfer.files[0]) {
       const file = event.dataTransfer.files[0];
       if (file.type.startsWith('image/')) {
+        setExcludedColorKeys(new Set()); // ++ 重置排除列表 ++
         processFile(file);
       } else {
         alert("请拖放图片文件 (JPG, PNG)");
@@ -223,7 +233,8 @@ export default function Home() {
       setMappedPixelData(null);
       setGridDimensions(null);
       setColorCounts(null);
-      setTotalBeadCount(0); // ++ 重置总数 ++
+      setTotalBeadCount(0);
+      // Exclusions are reset in handleFileChange/handleDrop before calling this
     };
     reader.onerror = () => {
         console.error("文件读取失败");
@@ -241,9 +252,9 @@ export default function Home() {
    // Handle palette selection change
    const handlePaletteChange = (event: ChangeEvent<HTMLSelectElement>) => {
      const newKey = event.target.value as PaletteOptionKey;
-     // Basic validation if needed, though useMemo handles fallback
      if (paletteOptions[newKey]) {
          setSelectedPaletteKeySet(newKey);
+         setExcludedColorKeys(new Set()); // ++ 重置排除列表 ++
      } else {
          console.warn(`Attempted to select invalid palette key: ${newKey}. Keeping current selection.`);
      }
@@ -267,15 +278,21 @@ export default function Home() {
     console.log("Canvas contexts obtained.");
 
     if (currentPalette.length === 0) {
-        console.error("Cannot pixelate: The selected color palette is empty.");
-        alert("错误：选定的颜色板为空，无法处理图像。");
-        return;
+        console.error("Cannot pixelate: The selected color palette is empty (likely due to exclusions).");
+        alert("错误：当前可用颜色板为空（可能所有颜色都被排除了），无法处理图像。请尝试恢复部分颜色。");
+        // Clear previous results visually
+        pixelatedCtx.clearRect(0, 0, pixelatedCanvas.width, pixelatedCanvas.height);
+        setMappedPixelData(null);
+        setGridDimensions(null);
+        // Keep colorCounts potentially showing the last valid counts? Or clear them too?
+        // setColorCounts(null); // Decide if clearing counts is desired when palette is empty
+        // setTotalBeadCount(0);
+        return; // Stop processing
     }
     const t1FallbackColor = currentPalette.find(p => p.key === 'T1')
                          || currentPalette.find(p => p.hex.toUpperCase() === '#FFFFFF')
-                         || currentPalette[0];
+                         || currentPalette[0]; // Use the first available color as fallback
     console.log("Using fallback color for empty cells:", t1FallbackColor);
-
 
     const img = new window.Image();
     img.onload = () => {
@@ -374,10 +391,10 @@ export default function Home() {
           const startRgb = keyToRgbMap.get(startCellData.key);
 
           if (!startRgb) {
-             console.warn(`RGB not found for key ${startCellData.key} at (${j},${i}) during merging. Skipping cell.`);
+             console.warn(`RGB not found for key ${startCellData.key} at (${j},${i}) during merging (might be excluded?). Using fallback for this cell.`);
              visited[j][i] = true;
-             mergedData[j][i] = { ...startCellData, isExternal: false};
-             continue;
+             mergedData[j][i] = { key: t1FallbackColor.key, color: t1FallbackColor.hex, isExternal: false };
+             continue; // Skip BFS starting from this invalid cell
           }
 
           const currentRegionCells: { r: number; c: number }[] = [];
@@ -438,7 +455,7 @@ export default function Home() {
                       mergedData[r][c] = { key: dominantKey, color: dominantColorHex, isExternal: false };
                   });
               } else {
-                  console.warn(`Dominant key "${dominantKey}" determined but not found in palette. Using fallback.`);
+                  console.warn(`Dominant key "${dominantKey}" determined but not found in *active* palette during merge. Using fallback.`);
                    currentRegionCells.forEach(({ r, c }) => {
                        mergedData[r][c] = { key: t1FallbackColor.key, color: t1FallbackColor.hex, isExternal: false };
                    });
@@ -544,15 +561,32 @@ export default function Home() {
     if (originalImageSrc && activeBeadPalette.length > 0) {
        const timeoutId = setTimeout(() => {
          if (originalImageSrc && originalCanvasRef.current && pixelatedCanvasRef.current && activeBeadPalette.length > 0) {
-           console.log("useEffect triggered: Processing image due to src, granularity, threshold, or palette change.");
+           console.log("useEffect triggered: Processing image due to src, granularity, threshold, palette, or exclusion change.");
            pixelateImage(originalImageSrc, granularity, similarityThreshold, activeBeadPalette);
          } else {
-            console.warn("useEffect check failed: Refs or palette not ready.");
+            console.warn("useEffect check failed inside timeout: Refs or palette not ready/empty.");
          }
        }, 50);
        return () => clearTimeout(timeoutId);
+    } else if (originalImageSrc && activeBeadPalette.length === 0) {
+        console.warn("Image selected, but the active palette is empty after exclusions. Cannot process. Clearing preview.");
+        const pixelatedCanvas = pixelatedCanvasRef.current;
+        const pixelatedCtx = pixelatedCanvas?.getContext('2d');
+        if (pixelatedCtx && pixelatedCanvas) {
+            pixelatedCtx.clearRect(0, 0, pixelatedCanvas.width, pixelatedCanvas.height);
+            // Draw a message on the canvas?
+            pixelatedCtx.fillStyle = '#6b7280'; // gray-500
+            pixelatedCtx.font = '16px sans-serif';
+            pixelatedCtx.textAlign = 'center';
+            pixelatedCtx.fillText('无可用颜色，请恢复部分排除的颜色', pixelatedCanvas.width / 2, pixelatedCanvas.height / 2);
+        }
+        setMappedPixelData(null);
+        setGridDimensions(null);
+        // Keep colorCounts to allow user to un-exclude colors
+        // setColorCounts(null);
+        // setTotalBeadCount(0);
     }
-  }, [originalImageSrc, granularity, similarityThreshold, activeBeadPalette]);
+  }, [originalImageSrc, granularity, similarityThreshold, activeBeadPalette, excludedColorKeys]);
 
     // --- Download function (ensure filename includes palette) ---
     const handleDownloadImage = () => {
@@ -652,6 +686,150 @@ export default function Home() {
         } catch (e) { console.error("下载统计图失败:", e); alert("无法生成统计图下载链接。"); }
     };
 
+    // --- Handler to toggle color exclusion ---
+    const handleToggleExcludeColor = (key: string) => {
+        // Add a check: Don't allow excluding if it's the *very last* color shown in the counts
+        const currentUsedKeys = colorCounts ? Object.keys(colorCounts) : [];
+        const nonExcludedUsedKeys = currentUsedKeys.filter(k => !excludedColorKeys.has(k));
+
+        if (nonExcludedUsedKeys.length === 1 && nonExcludedUsedKeys[0] === key && !excludedColorKeys.has(key)) {
+            alert(`不能排除最后一个在图中使用的颜色 (${key})。`);
+            return;
+        }
+
+        setExcludedColorKeys(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(key)) {
+                newSet.delete(key); // Re-include
+            } else {
+                newSet.add(key); // Exclude
+            }
+            console.log("Updated excluded keys:", newSet);
+            return newSet;
+        });
+    };
+
+  // --- Tooltip Logic ---
+
+  // Function to calculate cell and update tooltip
+  const updateTooltip = (clientX: number, clientY: number, pageX: number, pageY: number) => {
+    const canvas = pixelatedCanvasRef.current;
+    if (!canvas || !mappedPixelData || !gridDimensions) {
+      setTooltipData(null);
+      return false; // Indicate failure or no action
+    }
+
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const canvasX = (clientX - rect.left) * scaleX;
+    const canvasY = (clientY - rect.top) * scaleY;
+
+    const { N, M } = gridDimensions;
+    const cellWidthOutput = canvas.width / N;
+    const cellHeightOutput = canvas.height / M;
+
+    const i = Math.floor(canvasX / cellWidthOutput);
+    const j = Math.floor(canvasY / cellHeightOutput);
+
+    if (i >= 0 && i < N && j >= 0 && j < M) {
+      const cellData = mappedPixelData[j][i];
+      if (cellData && !cellData.isExternal && cellData.key) {
+        setTooltipData({
+          x: pageX, // Use page coordinates for positioning
+          y: pageY,
+          key: cellData.key,
+          color: cellData.color,
+        });
+        return true; // Indicate success
+      }
+    }
+
+    setTooltipData(null); // Hide if outside bounds or on background
+    return false;
+  };
+
+  // Clear any active long press timer and hide tooltip
+  const clearLongPress = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+     // Also hide tooltip when clearing, e.g., on touch end or move
+     // setTooltipData(null); // Let mouseLeave/touchEnd handle hiding specifically
+  };
+
+  // ++ Updated: Mouse move handler ++
+  const handleCanvasMouseMove = (event: React.MouseEvent<HTMLCanvasElement>) => {
+    // Prevent mouse events from interfering during touch interactions
+    if (touchStartPosRef.current) return;
+     clearLongPress(); // Clear any potential lingering timer
+    updateTooltip(event.clientX, event.clientY, event.pageX, event.pageY);
+  };
+
+  // ++ Updated: Mouse leave handler ++
+  const handleCanvasMouseLeave = () => {
+     // Prevent mouse events from interfering during touch interactions
+     if (touchStartPosRef.current) return;
+    clearLongPress();
+    setTooltipData(null);
+  };
+
+  // ++ 新增: Touch start handler ++
+  const handleTouchStart = (event: TouchEvent<HTMLCanvasElement>) => {
+    clearLongPress(); // Clear previous timer just in case
+    setTooltipData(null); // Hide any existing tooltip immediately on new touch
+    touchMovedRef.current = false; // Reset move flag
+
+    const touch = event.touches[0];
+    touchStartPosRef.current = { x: touch.clientX, y: touch.clientY, pageX: touch.pageX, pageY: touch.pageY };
+
+    // Set timer for long press
+    longPressTimerRef.current = setTimeout(() => {
+       // If touch hasn't moved significantly, show tooltip at start position
+      if (!touchMovedRef.current && touchStartPosRef.current) {
+         updateTooltip(touchStartPosRef.current.x, touchStartPosRef.current.y, touchStartPosRef.current.pageX, touchStartPosRef.current.pageY);
+      }
+      longPressTimerRef.current = null; // Timer has fired
+    }, 500); // 500ms delay for long press
+  };
+
+  // ++ 新增: Touch move handler ++
+  const handleTouchMove = (event: TouchEvent<HTMLCanvasElement>) => {
+     if (!touchStartPosRef.current) return;
+
+     const touch = event.touches[0];
+     const moveThreshold = 10; // Pixels threshold to detect movement
+
+     // Calculate distance moved
+     const dx = touch.clientX - touchStartPosRef.current.x;
+     const dy = touch.clientY - touchStartPosRef.current.y;
+     const distance = Math.sqrt(dx * dx + dy * dy);
+
+     if (distance > moveThreshold) {
+       touchMovedRef.current = true; // Mark as moved
+       clearLongPress(); // Cancel long press if finger moves too much
+       setTooltipData(null); // Hide tooltip if it was shown by long press
+     }
+
+     // Optional: Update tooltip while dragging (like mouse move)
+     // if (distance > moveThreshold) { // Or maybe always update while dragging?
+     //   updateTooltip(touch.clientX, touch.clientY, touch.pageX, touch.pageY);
+     // }
+  };
+
+  // ++ 新增: Touch end handler ++
+  const handleTouchEnd = () => {
+    clearLongPress();
+    // Hide tooltip only if it wasn't triggered by long press *just now*
+    // If the timer is already null (meaning it fired or was cleared by move), hide tooltip.
+    if (!longPressTimerRef.current) {
+        // Add a small delay before hiding to allow user to see info briefly after lifting finger
+        setTimeout(() => setTooltipData(null), 300);
+    }
+    touchStartPosRef.current = null; // Clear touch start position
+    touchMovedRef.current = false;
+  };
 
   return (
     <div className="min-h-screen p-4 sm:p-6 flex flex-col items-center bg-gray-50 font-[family-name:var(--font-geist-sans)]">
@@ -660,7 +838,7 @@ export default function Home() {
         <p className="mt-2 text-sm sm:text-base text-gray-600">上传图片，选择色板，生成带色号的图纸和统计</p>
       </header>
 
-      <main className="w-full max-w-4xl flex flex-col items-center space-y-5 sm:space-y-6">
+      <main className="w-full max-w-4xl flex flex-col items-center space-y-5 sm:space-y-6 relative"> {/* 添加 relative 定位 */}
         {/* Drop Zone */}
         <div
           onDrop={handleDrop} onDragOver={handleDragOver} onDragEnter={handleDragOver}
@@ -713,49 +891,132 @@ export default function Home() {
             <div className="w-full max-w-2xl">
               <canvas ref={originalCanvasRef} className="hidden"></canvas>
               <div className="bg-white p-3 sm:p-4 rounded-lg shadow">
-                <h2 className="text-base sm:text-lg font-medium mb-3 sm:mb-4 text-center text-gray-800">图纸预览（边缘背景已移除）</h2>
-                <div className="flex justify-center mb-3 sm:mb-4 bg-gray-100 p-2 rounded overflow-hidden" style={{ minHeight: '150px' }}>
-                  <canvas ref={pixelatedCanvasRef} className="border border-gray-300 max-w-full h-auto rounded block" style={{ maxHeight: '60vh', imageRendering: 'pixelated' }}></canvas>
+                <h2 className="text-base sm:text-lg font-medium mb-3 sm:mb-4 text-center text-gray-800">图纸预览（悬停或长按查看颜色）</h2>
+                <div className="flex justify-center mb-3 sm:mb-4 bg-gray-100 p-2 rounded overflow-hidden touch-none"
+                     style={{ minHeight: '150px' }}>
+                  <canvas
+                    ref={pixelatedCanvasRef}
+                    // Mouse events
+                    onMouseMove={handleCanvasMouseMove}
+                    onMouseLeave={handleCanvasMouseLeave}
+                    // Touch events
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                    onTouchCancel={handleTouchEnd} // Also clear on cancel
+                    className="border border-gray-300 max-w-full h-auto rounded block cursor-crosshair"
+                    style={{ maxHeight: '60vh', imageRendering: 'pixelated' }}
+                  />
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* Color Counts Display */}
-        {colorCounts && Object.keys(colorCounts).length > 0 && (
+        {/* ++ Combined Color Counts and Exclusion Area ++ */}
+        {originalImageSrc && colorCounts && Object.keys(colorCounts).length > 0 && (
           <div className="w-full max-w-2xl mt-6 bg-white p-4 rounded-lg shadow">
-            {/* Display selected palette name and total count in the title */}
-            <h3 className="text-lg font-semibold mb-4 text-gray-700 text-center">
-              颜色统计 ({paletteOptions[selectedPaletteKeySet]?.name || '未知色板'}) - 总计: {totalBeadCount} 颗
+            <h3 className="text-lg font-semibold mb-1 text-gray-700 text-center">
+              颜色统计与排除 ({paletteOptions[selectedPaletteKeySet]?.name || '未知色板'})
             </h3>
-            <ul className="space-y-2 max-h-60 overflow-y-auto pr-2">
-              {Object.keys(colorCounts).sort(sortColorKeys).map((key) => (
-                  <li key={key} className="flex items-center justify-between text-sm border-b border-gray-200 pb-1">
-                    <div className="flex items-center space-x-2">
-                      <span className="inline-block w-4 h-4 rounded border border-gray-400" style={{ backgroundColor: colorCounts[key].color }} title={`Hex: ${colorCounts[key].color}`}></span>
-                      <span className="font-mono font-medium text-gray-800">{key}</span>
-                    </div>
-                    <span className="text-gray-600">{colorCounts[key].count} 颗</span>
-                  </li>
-                ))}
+            <p className="text-xs text-center text-gray-500 mb-3">点击下方列表中的颜色可将其从可用列表中排除/恢复。总计: {totalBeadCount} 颗</p>
+            <ul className="space-y-1 max-h-60 overflow-y-auto pr-2 text-sm">
+              {Object.keys(colorCounts)
+                .sort(sortColorKeys)
+                .map((key) => {
+                  const isExcluded = excludedColorKeys.has(key);
+                  const count = colorCounts[key].count;
+                  const colorHex = colorCounts[key].color; // Get color from counts data
+
+                  return (
+                    <li
+                      key={key}
+                      onClick={() => handleToggleExcludeColor(key)}
+                      className={`flex items-center justify-between p-1.5 rounded cursor-pointer transition-colors ${
+                        isExcluded
+                          ? 'bg-red-100 hover:bg-red-200 opacity-60' // Adjusted style for excluded items in this list
+                          : 'hover:bg-gray-100'
+                      }`}
+                      title={isExcluded ? `点击恢复 ${key}` : `点击排除 ${key}`}
+                    >
+                      <div className={`flex items-center space-x-2 ${isExcluded ? 'line-through' : ''}`}>
+                        <span
+                          className="inline-block w-4 h-4 rounded border border-gray-400 flex-shrink-0"
+                          style={{ backgroundColor: isExcluded ? '#cccccc' : colorHex }} // Gray out swatch if excluded
+                        ></span>
+                        <span className={`font-mono font-medium ${isExcluded ? 'text-red-700' : 'text-gray-800'}`}>{key}</span>
+                      </div>
+                      <span className={`text-xs ${isExcluded ? 'text-red-600 line-through' : 'text-gray-600'}`}>{count} 颗</span>
+                    </li>
+                  );
+                })}
             </ul>
+            {excludedColorKeys.size > 0 && (
+                <button
+                    onClick={() => setExcludedColorKeys(new Set())}
+                    className="mt-3 w-full text-xs py-1.5 px-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                >
+                    恢复所有排除的颜色 ({excludedColorKeys.size})
+                </button>
+            )}
           </div>
         )}
+        {/* Message if palette becomes empty */}
+         {originalImageSrc && activeBeadPalette.length === 0 && excludedColorKeys.size > 0 && (
+             <div className="w-full max-w-2xl mt-6 bg-yellow-100 p-4 rounded-lg shadow text-center text-sm text-yellow-800">
+                 当前所有颜色均被排除或所选色板为空。请在上方统计列表中点击恢复部分颜色，或更换色板。
+                 {excludedColorKeys.size > 0 && (
+                      <button
+                          onClick={() => setExcludedColorKeys(new Set())}
+                          className="mt-2 ml-2 text-xs py-1 px-2 bg-yellow-200 text-yellow-900 rounded hover:bg-yellow-300"
+                      >
+                          恢复所有 ({excludedColorKeys.size})
+                      </button>
+                  )}
+             </div>
+         )}
 
         {/* Download Buttons */}
         {originalImageSrc && mappedPixelData && (
-          <div className="w-full max-w-2xl mt-4 flex flex-col sm:flex-row gap-2 sm:gap-3">
-             <button onClick={handleDownloadImage} className="flex-1 py-2 px-4 bg-green-600 text-white text-sm sm:text-base rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
-               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-               下载图纸 (带色号)
-             </button>
-             <button onClick={handleDownloadStatsImage} disabled={!colorCounts || totalBeadCount === 0} className="flex-1 py-2 px-4 bg-purple-600 text-white text-sm sm:text-base rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
-               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-               下载数量表 (PNG)
-             </button>
-           </div>
+            <div className="w-full max-w-2xl mt-4 flex flex-col sm:flex-row gap-2 sm:gap-3">
+              <button
+                onClick={handleDownloadImage}
+                disabled={!mappedPixelData || !gridDimensions || gridDimensions.N === 0 || gridDimensions.M === 0 || activeBeadPalette.length === 0}
+                className="flex-1 py-2 px-4 bg-green-600 text-white text-sm sm:text-base rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+               >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                下载图纸 (带色号)
+              </button>
+              <button
+                onClick={handleDownloadStatsImage}
+                disabled={!colorCounts || totalBeadCount === 0 || activeBeadPalette.length === 0}
+                className="flex-1 py-2 px-4 bg-purple-600 text-white text-sm sm:text-base rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                下载数量表 (PNG)
+              </button>
+            </div>
         )}
+
+         {/* Tooltip Display (remains the same) */}
+         {tooltipData && (
+            <div
+              className="absolute bg-gray-800 text-white text-xs px-2 py-1 rounded shadow-lg pointer-events-none flex items-center space-x-1.5 z-50"
+              style={{
+                left: `${tooltipData.x + 15}px`,
+                top: `${tooltipData.y + 15}px`,
+                transform: 'translate(-50%, -100%)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+               <span
+                 className="inline-block w-3 h-3 rounded-sm border border-gray-400 flex-shrink-0"
+                 style={{ backgroundColor: tooltipData.color }}
+               ></span>
+               <span className="font-mono font-semibold">{tooltipData.key}</span>
+            </div>
+          )}
+
       </main>
 
       <footer className="w-full max-w-4xl mt-10 mb-6 py-4 text-center text-xs sm:text-sm text-gray-500 border-t border-gray-200">
