@@ -1182,7 +1182,7 @@ export default function Home() {
       <footer className="w-full max-w-4xl mt-10 mb-6 py-4 text-center text-xs sm:text-sm text-gray-500 border-t border-gray-200">
         <p>拼豆底稿生成器 &copy; {new Date().getFullYear()}</p>
         <p className="mt-1">
-          <a href="https://github.com/Zippland/perler-beads.git" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline ml-2">在 GitHub 上查看源码</a>
+          <a href="https://github.com/Zippland/perler-beads.git" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline ml-2">有用可以给github项目一个Star</a>
         </p>
       </footer>
     </div>
