@@ -320,7 +320,7 @@ export default function Home() {
       console.log("Original image drawn.");
 
       const cellWidthOriginal = img.width / N; const cellHeightOriginal = img.height / M;
-      const cellWidthOutput = outputWidth / N; const cellHeightOutput = outputHeight / M;
+      // const cellWidthOutput = outputWidth / N; const cellHeightOutput = outputHeight / M; // ++ REMOVED unused variables ++
 
       console.log("Starting initial color mapping...");
       let processedCells = 0;
