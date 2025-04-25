@@ -153,6 +153,7 @@ export default function Home() {
   // ++ 新增: Tooltip 状态 ++
   const [tooltipData, setTooltipData] = useState<{ x: number; y: number; key: string; color: string } | null>(null);
   const [remapTrigger, setRemapTrigger] = useState(0); // ++ NEW: Trigger for full remap
+  const [initialGridColorKeys, setInitialGridColorKeys] = useState<Set<string> | null>(null); // ++ 新增：存储初始颜色键
 
   // ++ Refs for touch handling ++
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -235,11 +236,13 @@ export default function Home() {
       setGridDimensions(null);
       setColorCounts(null);
       setTotalBeadCount(0);
+      setInitialGridColorKeys(null); // ++ 重置初始键 ++
       setRemapTrigger(prev => prev + 1); // Trigger full remap for new image
     };
     reader.onerror = () => {
         console.error("文件读取失败");
         alert("无法读取文件。");
+        setInitialGridColorKeys(null); // ++ 重置初始键 ++
     }
     reader.readAsDataURL(file);
   };
@@ -501,32 +504,24 @@ export default function Home() {
 
 
       // --- Second Loop: Draw Cells and Borders using mergedData ---
-      console.log("Starting final drawing loop on pixelated canvas...");
-      pixelatedCtx.clearRect(0, 0, outputWidth, outputHeight); // Clear canvas before drawing
-      pixelatedCtx.lineWidth = 1; // Set line width once
-
+      // console.log("Starting final drawing loop on pixelated canvas..."); // ++ 移除日志 ++
+      // pixelatedCtx.clearRect(0, 0, outputWidth, outputHeight); // Clear canvas before drawing // ++ 移除 ++
+      // pixelatedCtx.lineWidth = 1; // Set line width once // ++ 移除 ++
+      /* ++ 移除整个绘制循环 ++
       for (let j = 0; j < M; j++) {
           for (let i = 0; i < N; i++) {
-              // ++ Use mergedData which includes merged colors and isExternal flag ++
-              const cellData = mergedData[j][i];
-              const drawX = i * cellWidthOutput;
-              const drawY = j * cellHeightOutput;
-
-              // Fill the cell background
-              if (cellData.isExternal) {
-                  pixelatedCtx.fillStyle = '#F3F4F6'; // Preview background color for external cells
-              } else {
-                  pixelatedCtx.fillStyle = cellData.color; // Bead color for internal cells
-              }
-              pixelatedCtx.fillRect(drawX, drawY, cellWidthOutput, cellHeightOutput);
-
-              // Draw the border for ALL cells
-              pixelatedCtx.strokeStyle = '#EEEEEE'; // Grid line color
-              pixelatedCtx.strokeRect(drawX + 0.5, drawY + 0.5, cellWidthOutput, cellHeightOutput);
+              // ... (original drawing code) ...
           }
       }
-      console.log("Final drawing loop complete.");
+      */
+      // console.log("Final drawing loop complete."); // ++ 移除日志 ++
 
+      // ++ 在设置状态之前调用新的绘制函数 ++
+      if (pixelatedCanvasRef.current) { // ++ 添加检查 ++
+        drawPixelatedCanvas(mergedData, pixelatedCanvasRef, { N, M });
+      } else {
+        console.error("Pixelated canvas ref is null, skipping draw call in pixelateImage.");
+      }
 
       // Update state and counts using mergedData (excluding external)
       setMappedPixelData(mergedData);
@@ -548,13 +543,15 @@ export default function Home() {
       });
       setColorCounts(counts);
       setTotalBeadCount(totalCount); // ++ 更新总数状态 ++
+      setInitialGridColorKeys(new Set(Object.keys(counts))); // ++ 存储初始颜色键 ++
       console.log("Color counts updated based on merged data (excluding external background):", counts);
       console.log("Total bead count (excluding background):", totalCount); // ++ 打印总数 ++
+      console.log("Stored initial grid color keys:", Object.keys(counts)); // ++ 记录初始键日志 ++
 
     };
     img.onerror = (error: Event | string) => {
       console.error("Image loading failed:", error); alert("无法加载图片。");
-      setOriginalImageSrc(null); setMappedPixelData(null); setGridDimensions(null); setColorCounts(null);
+      setOriginalImageSrc(null); setMappedPixelData(null); setGridDimensions(null); setColorCounts(null); setInitialGridColorKeys(null); // ++ 清空初始键 ++
     };
     console.log("Setting image source...");
     img.src = imageSrc;
@@ -562,13 +559,14 @@ export default function Home() {
 
   // Use useEffect to trigger pixelation
   useEffect(() => {
-    if (originalImageSrc && activeBeadPalette.length > 0) {
+    if (originalImageSrc && activeBeadPalette.length > 0) { // Keep activeBeadPalette check here to prevent running if empty
        const timeoutId = setTimeout(() => {
+         // Add internal check for activeBeadPalette length again just before calling pixelate
          if (originalImageSrc && originalCanvasRef.current && pixelatedCanvasRef.current && activeBeadPalette.length > 0) {
-           console.log("useEffect triggered: Processing image due to src, granularity, threshold, palette, or exclusion change.");
-           pixelateImage(originalImageSrc, granularity, similarityThreshold, activeBeadPalette);
+           console.log("useEffect triggered: Processing image due to src, granularity, threshold, palette selection, or remap trigger.");
+           pixelateImage(originalImageSrc, granularity, similarityThreshold, activeBeadPalette); // Pass activeBeadPalette here
          } else {
-            console.warn("useEffect check failed inside timeout: Refs or palette not ready/empty.");
+            console.warn("useEffect check failed inside timeout: Refs or active palette not ready/empty.");
          }
        }, 50);
        return () => clearTimeout(timeoutId);
@@ -590,7 +588,8 @@ export default function Home() {
         // setColorCounts(null);
         // setTotalBeadCount(0);
     }
-  }, [originalImageSrc, granularity, similarityThreshold, selectedPaletteKeySet, remapTrigger, activeBeadPalette]);
+    // *** REMOVED activeBeadPalette from dependency array ***
+  }, [originalImageSrc, granularity, similarityThreshold, selectedPaletteKeySet, remapTrigger]); // Dependencies controlling full remap
 
     // --- Download function (ensure filename includes palette) ---
     const handleDownloadImage = () => {
@@ -696,65 +695,112 @@ export default function Home() {
         const isExcluding = !currentExcluded.has(key);
 
         if (isExcluding) {
-            console.log(`Attempting to exclude color: ${key}`);
-            const currentUsedKeys = colorCounts ? Object.keys(colorCounts) : [];
-            const nonExcludedUsedKeys = currentUsedKeys.filter(k => !currentExcluded.has(k));
+            console.log(`---------\nAttempting to EXCLUDE color: ${key}`); // ++ Log Start ++
 
-            if (nonExcludedUsedKeys.length <= 1 && nonExcludedUsedKeys[0] === key) {
-                alert(`不能排除最后一个在图中使用的颜色 (${key})。`); return;
+            // --- 确保初始颜色键已记录 ---
+            if (!initialGridColorKeys) {
+                console.error("Cannot exclude color: Initial grid color keys not yet calculated.");
+                alert("无法排除颜色，初始颜色数据尚未准备好，请稍候。");
+                return;
             }
+            console.log("Initial Grid Keys:", Array.from(initialGridColorKeys)); // ++ Log Initial Keys ++
+            console.log("Currently Excluded Keys (before this op):", Array.from(currentExcluded)); // ++ Log Current Exclusions ++
 
             const nextExcludedKeys = new Set(currentExcluded); nextExcludedKeys.add(key);
-            const currentOption = paletteOptions[selectedPaletteKeySet];
-            const baseKeys = currentOption ? new Set(currentOption.keys) : new Set(allPaletteKeys);
-            const paletteAfterExclusion = fullBeadPalette.filter(color =>
-                baseKeys.has(color.key) && !nextExcludedKeys.has(color.key)
-            );
 
-            if (paletteAfterExclusion.length === 0) {
-                alert(`排除 ${key} 后将没有可用颜色。无法排除。`); return;
+            // --- 使用初始颜色键进行重映射目标逻辑 ---
+            // 1. 从初始网格颜色集合开始
+            const potentialRemapKeys = new Set(initialGridColorKeys);
+            console.log("Step 1: Potential Keys (from initial):", Array.from(potentialRemapKeys));
+
+            // 2. 移除当前要排除的键
+            potentialRemapKeys.delete(key);
+            console.log(`Step 2: Potential Keys (after removing ${key}):`, Array.from(potentialRemapKeys));
+
+            // 3. 移除任何*其他*当前也被排除的键
+            currentExcluded.forEach(excludedKey => {
+                potentialRemapKeys.delete(excludedKey);
+            });
+            console.log("Step 3: Potential Keys (after removing other current exclusions):", Array.from(potentialRemapKeys)); // ++ Log Final Potential Keys ++
+
+            // 4. 基于剩余的*初始*颜色键创建重映射调色板
+            const remapTargetPalette = fullBeadPalette.filter(color => potentialRemapKeys.has(color.key));
+            const remapTargetKeys = remapTargetPalette.map(p => p.key); // ++ Log Target Palette Keys ++
+            console.log("Step 4: Remap Target Palette Keys:", remapTargetKeys);
+
+            // 5. *** 关键检查 ***：如果在考虑所有排除项后，没有*初始*颜色可供映射，则阻止此次排除
+            if (remapTargetPalette.length === 0) {
+                console.warn(`Cannot exclude color '${key}'. No other valid colors from the initial grid remain after considering all current exclusions.`);
+                alert(`无法排除颜色 ${key}，因为图中最初存在的其他可用颜色也已被排除。请先恢复部分其他颜色。`);
+                console.log("---------"); // ++ Log End ++
+                return; // 停止排除过程
             }
+            console.log(`Remapping target palette (based on initial grid colors minus all exclusions) contains ${remapTargetPalette.length} colors.`);
+            // --- 结束修正逻辑 ---
 
             const excludedColorData = fullBeadPalette.find(p => p.key === key);
-            if (!excludedColorData || !mappedPixelData || !gridDimensions) { /* Error */ return; }
+            // 检查排除颜色的数据是否存在
+             if (!excludedColorData || !mappedPixelData || !gridDimensions) {
+                 console.error("Cannot exclude color: Missing data for remapping.");
+                 alert("无法排除颜色，缺少必要数据。");
+                 console.log("---------"); // ++ Log End ++
+                 return;
+             }
+
 
             console.log(`Remapping cells currently using excluded color: ${key}`);
-            // Create a deep copy ONLY if remapping is needed
+            // 仅在需要重映射时创建深拷贝
             const newMappedData = mappedPixelData.map(row => row.map(cell => ({...cell})));
             let remappedCount = 0; const { N, M } = gridDimensions;
+            let firstReplacementKey: string | null = null; // Log the first replacement
 
             for (let j = 0; j < M; j++) { for (let i = 0; i < N; i++) {
                 const cell = newMappedData[j]?.[i];
+                // 此条件正确地仅针对具有排除键的单元格
                 if (cell && !cell.isExternal && cell.key === key) {
-                    const replacementColor = findClosestPaletteColor(excludedColorData.rgb, paletteAfterExclusion);
+                    // *** 使用派生的 remapTargetPalette（此处保证非空）查找最接近的颜色 ***
+                    const replacementColor = findClosestPaletteColor(excludedColorData.rgb, remapTargetPalette);
+                    if (!firstReplacementKey) firstReplacementKey = replacementColor.key; // ++ Log Replacement Key ++
                     newMappedData[j][i] = { ...cell, key: replacementColor.key, color: replacementColor.hex };
                     remappedCount++;
                 }
             }}
-            console.log(`Remapped ${remappedCount} cells.`);
+            console.log(`Remapped ${remappedCount} cells. First replacement key found was: ${firstReplacementKey || 'N/A'}`); // ++ Log Replacement Key ++
 
-            // Update states together
-            setExcludedColorKeys(nextExcludedKeys);
-            setMappedPixelData(newMappedData);
+            // 同时更新状态
+            setExcludedColorKeys(nextExcludedKeys); // 应用此颜色的排除
+            setMappedPixelData(newMappedData); // 使用重映射的数据更新
 
-            // Recalculate counts
+            // 基于*新*映射数据重新计算计数
             const newCounts: { [key: string]: { count: number; color: string } } = {}; let newTotalCount = 0;
             newMappedData.flat().forEach(cell => { if (cell && cell.key && !cell.isExternal) {
                 if (!newCounts[cell.key]) {
                     const colorData = fullBeadPalette.find(p => p.key === cell.key);
+                    // 确保颜色数据存在
                     newCounts[cell.key] = { count: 0, color: colorData?.hex || '#000000' };
                 }
                 newCounts[cell.key].count++; newTotalCount++;
             }});
             setColorCounts(newCounts); setTotalBeadCount(newTotalCount);
-            console.log("State updated after exclusion remap.");
+            console.log("State updated after exclusion and local remap based on initial grid colors.");
+            console.log("---------"); // ++ Log End ++
+
+            // ++ 在更新状态后，重新绘制 Canvas ++
+            if (pixelatedCanvasRef.current && gridDimensions) { // ++ 添加检查 ++
+              drawPixelatedCanvas(newMappedData, pixelatedCanvasRef, gridDimensions);
+            } else {
+               console.error("Canvas ref or grid dimensions missing, skipping draw call in handleToggleExcludeColor.");
+            }
 
         } else {
             // --- Re-including ---
+            console.log(`---------\nAttempting to RE-INCLUDE color: ${key}`); // ++ Log Start ++
             console.log(`Re-including color: ${key}. Triggering full remap.`);
             const nextExcludedKeys = new Set(currentExcluded); nextExcludedKeys.delete(key);
-            setExcludedColorKeys(nextExcludedKeys); // Update exclusion set first
-            setRemapTrigger(prev => prev + 1); // Then trigger full remap via useEffect
+            setExcludedColorKeys(nextExcludedKeys);
+            // 此处无需重置 initialGridColorKeys，完全重映射会通过 pixelateImage 重新计算它
+            setRemapTrigger(prev => prev + 1); // *** KEPT setRemapTrigger here for re-inclusion ***
+            console.log("---------"); // ++ Log End ++
         }
     };
 
@@ -878,6 +924,61 @@ export default function Home() {
     }
     touchStartPosRef.current = null; // Clear touch start position
     touchMovedRef.current = false;
+  };
+
+  // ++ 新增：绘制像素化 Canvas 的函数 ++
+  const drawPixelatedCanvas = (
+      dataToDraw: { key: string; color: string; isExternal?: boolean }[][],
+      canvasRef: React.RefObject<HTMLCanvasElement | null>, // ++ 修改类型定义 ++
+      dims: { N: number; M: number } | null
+  ) => {
+      const canvas = canvasRef.current; // canvas 现在可能是 null
+      if (!canvas || !dims || dims.N <= 0 || dims.M <= 0) { // 这里的 !canvas 检查会处理 null 情况
+          console.warn("无法绘制 Canvas：Ref 为 null、尺寸无效或数据未准备好。");
+          // Optionally clear canvas if dimensions are invalid?
+          const ctx = canvas?.getContext('2d'); // 使用 optional chaining
+          if (ctx && canvas) ctx.clearRect(0, 0, canvas.width, canvas.height);
+          return;
+      }
+      // 从这里开始，我们知道 canvas 不是 null
+      const pixelatedCtx = canvas.getContext('2d');
+      if (!pixelatedCtx) {
+          console.error("无法获取 Pixelated Canvas Context。");
+          return;
+      }
+
+      const { N, M } = dims;
+      const outputWidth = canvas.width; // Use actual canvas size
+      const outputHeight = canvas.height;
+      const cellWidthOutput = outputWidth / N;
+      const cellHeightOutput = outputHeight / M;
+
+      console.log("Redrawing pixelated canvas...");
+      pixelatedCtx.clearRect(0, 0, outputWidth, outputHeight); // 清除旧内容
+      pixelatedCtx.lineWidth = 1; // 设置线宽
+
+      for (let j = 0; j < M; j++) {
+          for (let i = 0; i < N; i++) {
+              const cellData = dataToDraw[j]?.[i]; // Use optional chaining for safety
+              if (!cellData) continue; // Skip if cell data is missing
+
+              const drawX = i * cellWidthOutput;
+              const drawY = j * cellHeightOutput;
+
+              // 填充单元格背景
+              if (cellData.isExternal) {
+                  pixelatedCtx.fillStyle = '#F3F4F6'; // 外部单元格的预览背景色
+              } else {
+                  pixelatedCtx.fillStyle = cellData.color; // 内部单元格的珠子颜色
+              }
+              pixelatedCtx.fillRect(drawX, drawY, cellWidthOutput, cellHeightOutput);
+
+              // 绘制所有单元格的边框
+              pixelatedCtx.strokeStyle = '#EEEEEE'; // 网格线颜色
+              pixelatedCtx.strokeRect(drawX + 0.5, drawY + 0.5, cellWidthOutput, cellHeightOutput);
+          }
+      }
+      console.log("Pixelated canvas redraw complete.");
   };
 
   return (
@@ -1005,6 +1106,7 @@ export default function Home() {
                     onClick={() => {
                          console.log("Restoring all excluded colors. Triggering full remap.");
                          setExcludedColorKeys(new Set()); // Update exclusion set first
+                         setInitialGridColorKeys(null); // ++ 重置初始键 - 它们将在完全重映射后重新计算 ++
                          setRemapTrigger(prev => prev + 1); // Then trigger full remap
                     }}
                     className="mt-3 w-full text-xs py-1.5 px-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
@@ -1023,6 +1125,7 @@ export default function Home() {
                           onClick={() => {
                                 console.log("Restoring all excluded colors from empty message. Triggering full remap.");
                                 setExcludedColorKeys(new Set());
+                                setInitialGridColorKeys(null); // ++ 重置初始键 ++
                                 setRemapTrigger(prev => prev + 1);
                            }}
                           className="mt-2 ml-2 text-xs py-1 px-2 bg-yellow-200 text-yellow-900 rounded hover:bg-yellow-300"
