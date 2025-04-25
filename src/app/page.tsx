@@ -148,6 +148,7 @@ export default function Home() {
   const [mappedPixelData, setMappedPixelData] = useState<{ key: string; color: string; isExternal?: boolean }[][] | null>(null);
   const [gridDimensions, setGridDimensions] = useState<{ N: number; M: number } | null>(null);
   const [colorCounts, setColorCounts] = useState<{ [key: string]: { count: number; color: string } } | null>(null);
+  const [totalBeadCount, setTotalBeadCount] = useState<number>(0); // ++ 添加总数状态 ++
 
   // --- Memoize the selected palette ---
   const activeBeadPalette = useMemo(() => {
@@ -222,6 +223,7 @@ export default function Home() {
       setMappedPixelData(null);
       setGridDimensions(null);
       setColorCounts(null);
+      setTotalBeadCount(0); // ++ 重置总数 ++
     };
     reader.onerror = () => {
         console.error("文件读取失败");
@@ -510,6 +512,7 @@ export default function Home() {
       setGridDimensions({ N, M });
 
       const counts: { [key: string]: { count: number; color: string } } = {};
+      let totalCount = 0; // ++ 初始化总数计数器 ++
       // ++ Iterate over mergedData for final counts ++
       mergedData.flat().forEach(cell => {
         // Only count cells that are not marked as external background
@@ -519,10 +522,13 @@ export default function Home() {
             counts[cell.key] = { count: 0, color: cell.color };
           }
           counts[cell.key].count++;
+          totalCount++; // ++ 累加总数 ++
         }
       });
       setColorCounts(counts);
+      setTotalBeadCount(totalCount); // ++ 更新总数状态 ++
       console.log("Color counts updated based on merged data (excluding external background):", counts);
+      console.log("Total bead count (excluding background):", totalCount); // ++ 打印总数 ++
 
     };
     img.onerror = (error: Event | string) => {
@@ -719,8 +725,10 @@ export default function Home() {
         {/* Color Counts Display */}
         {colorCounts && Object.keys(colorCounts).length > 0 && (
           <div className="w-full max-w-2xl mt-6 bg-white p-4 rounded-lg shadow">
-            {/* Display selected palette name in the title */}
-            <h3 className="text-lg font-semibold mb-4 text-gray-700 text-center">颜色统计 ({paletteOptions[selectedPaletteKeySet]?.name || '未知色板'})</h3>
+            {/* Display selected palette name and total count in the title */}
+            <h3 className="text-lg font-semibold mb-4 text-gray-700 text-center">
+              颜色统计 ({paletteOptions[selectedPaletteKeySet]?.name || '未知色板'}) - 总计: {totalBeadCount} 颗
+            </h3>
             <ul className="space-y-2 max-h-60 overflow-y-auto pr-2">
               {Object.keys(colorCounts).sort(sortColorKeys).map((key) => (
                   <li key={key} className="flex items-center justify-between text-sm border-b border-gray-200 pb-1">
@@ -742,7 +750,7 @@ export default function Home() {
                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                下载图纸 (带色号)
              </button>
-             <button onClick={handleDownloadStatsImage} disabled={!colorCounts} className="flex-1 py-2 px-4 bg-purple-600 text-white text-sm sm:text-base rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+             <button onClick={handleDownloadStatsImage} disabled={!colorCounts || totalBeadCount === 0} className="flex-1 py-2 px-4 bg-purple-600 text-white text-sm sm:text-base rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                下载数量表 (PNG)
              </button>
