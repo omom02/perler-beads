@@ -80,6 +80,12 @@ const fullBeadPalette: PaletteColor[] = Object.entries(beadPaletteData)
   })
   .filter((color): color is PaletteColor => color !== null);
 
+// ++ 添加透明键定义 ++
+const TRANSPARENT_KEY = 'ERASE';
+
+// ++ 添加透明色数据 ++
+const transparentColorData: MappedPixel = { key: TRANSPARENT_KEY, color: '#FFFFFF', isExternal: true };
+
 // ++ Add definition for background color keys ++
 const BACKGROUND_COLOR_KEYS = ['T1', 'H1', 'H2']; // 可以根据需要调整
 
@@ -1042,17 +1048,65 @@ export default function Home() {
         const currentCell = newPixelData[j]?.[i]; // Get current cell data safely
 
         // Check if the color needs changing OR if it was an external cell being colored
-        if (!currentCell || currentCell.key !== selectedColor.key || currentCell.isExternal) {
-          // ++ Apply selected color/key AND ensure isExternal is false ++
-          newPixelData[j][i] = { ...selectedColor, isExternal: false };
+        if (!currentCell) return; // Prevent invalid cells
+
+        const previousKey = currentCell.key;
+        const wasExternal = currentCell.isExternal;
+        
+        // Determine new cell data
+        let newCellData: MappedPixel;
+        
+        // Check if using eraser
+        if (selectedColor.key === TRANSPARENT_KEY) {
+          // Erasing: Mark as external
+          newCellData = { ...transparentColorData };
+        } else {
+          // Normal coloring: Apply selected color and mark as internal
+          newCellData = { ...selectedColor, isExternal: false };
+        }
+
+        // Only update if state actually changes
+        if (newCellData.key !== previousKey || newCellData.isExternal !== wasExternal) {
+          newPixelData[j][i] = newCellData;
           setMappedPixelData(newPixelData);
 
-          // Explicitly redraw canvas immediately after state update
+          // Update color counts
+          if (colorCounts) {
+            const newColorCounts = { ...colorCounts };
+            let newTotalCount = totalBeadCount;
+
+            // If previous was internal bead, decrement its count
+            if (!wasExternal && previousKey !== TRANSPARENT_KEY && newColorCounts[previousKey]) {
+              newColorCounts[previousKey].count--;
+              if (newColorCounts[previousKey].count <= 0) {
+                delete newColorCounts[previousKey]; // Remove if count reaches zero
+              }
+              newTotalCount--;
+            }
+
+            // If new is internal bead, increment its count
+            if (!newCellData.isExternal && newCellData.key !== TRANSPARENT_KEY) {
+              if (!newColorCounts[newCellData.key]) {
+                const colorInfo = fullBeadPalette.find(p => p.key === newCellData.key);
+                newColorCounts[newCellData.key] = {
+                  count: 0,
+                  color: colorInfo?.hex || '#000000'
+                };
+              }
+              newColorCounts[newCellData.key].count++;
+              newTotalCount++;
+            }
+
+            setColorCounts(newColorCounts);
+            setTotalBeadCount(newTotalCount);
+          }
+
+          // Immediately redraw canvas
           if (pixelatedCanvasRef.current) {
             drawPixelatedCanvas(newPixelData, pixelatedCanvasRef, gridDimensions);
           }
         }
-        // After a click in manual mode, always clear the tooltip
+        // Clear tooltip after click
         setTooltipData(null);
       }
       // Tooltip Logic (only show if NOT a manual coloring click)
@@ -1197,11 +1251,12 @@ export default function Home() {
                   </button>
                   {/* Color Palette (only in manual mode) */}
                   <div className="mt-3">
-                    <p className="text-xs text-center text-gray-600 mb-2">选择颜色后，点击下方画布格子进行填充:</p>
+                    <p className="text-xs text-center text-gray-600 mb-2">选择颜色或橡皮擦后，点击下方画布格子进行填充或擦除:</p>
                     <ColorPalette
-                      colors={currentGridColors}
+                      colors={[transparentColorData, ...currentGridColors]}
                       selectedColor={selectedColor}
                       onColorSelect={setSelectedColor}
+                      transparentKey={TRANSPARENT_KEY}
                     />
                   </div>
                 </div>
@@ -1209,9 +1264,6 @@ export default function Home() {
 
               {/* Canvas Preview Container */}
               <div className="bg-white p-3 sm:p-4 rounded-lg shadow">
-                 <h2 className="text-base sm:text-lg font-medium mb-3 sm:mb-4 text-center text-gray-800">
-                   {isManualColoringMode ? "手动上色中... (点击格子填充)" : "图纸预览（悬停或长按查看颜色）"}
-                 </h2>
                 <div className="flex justify-center mb-3 sm:mb-4 bg-gray-100 p-2 rounded overflow-hidden touch-none"
                      style={{ minHeight: '150px' }}>
                   <canvas
