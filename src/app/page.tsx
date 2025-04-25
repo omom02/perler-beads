@@ -78,6 +78,9 @@ const fullBeadPalette: PaletteColor[] = Object.entries(beadPaletteData)
   })
   .filter((color): color is PaletteColor => color !== null);
 
+// ++ Add definition for background color keys ++
+const BACKGROUND_COLOR_KEYS = ['T1', 'H1', 'H2']; // 可以根据需要调整
+
 // Helper function to find the closest color in the *selected* palette
 function findClosestPaletteColor(
     avgRgb: { r: number; g: number; b: number },
@@ -138,10 +141,11 @@ export default function Home() {
   const [originalImageSrc, setOriginalImageSrc] = useState<string | null>(null);
   const [granularity, setGranularity] = useState<number>(50);
   const [selectedPaletteKeySet, setSelectedPaletteKeySet] = useState<PaletteOptionKey>('all'); // Default to 'all'
+  const [similarityThreshold, setSimilarityThreshold] = useState<number>(35); // ++ Add state for similarity threshold ++
   const originalCanvasRef = useRef<HTMLCanvasElement>(null);
   const pixelatedCanvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [mappedPixelData, setMappedPixelData] = useState<{ key: string; color: string }[][] | null>(null);
+  const [mappedPixelData, setMappedPixelData] = useState<{ key: string; color: string; isExternal?: boolean }[][] | null>(null);
   const [gridDimensions, setGridDimensions] = useState<{ N: number; M: number } | null>(null);
   const [colorCounts, setColorCounts] = useState<{ [key: string]: { count: number; color: string } } | null>(null);
 
@@ -243,9 +247,14 @@ export default function Home() {
      }
    };
 
+  // ++ Add handler for similarity threshold change ++
+  const handleSimilarityChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setSimilarityThreshold(parseInt(event.target.value, 10));
+  };
+
   // Core function: Pixelate the image
-  const pixelateImage = (imageSrc: string, detailLevel: number, currentPalette: PaletteColor[]) => {
-    console.log("Attempting to pixelate and map colors using selected palette...");
+  const pixelateImage = (imageSrc: string, detailLevel: number, threshold: number, currentPalette: PaletteColor[]) => {
+    console.log(`Attempting to pixelate with threshold: ${threshold}`);
     const originalCanvas = originalCanvasRef.current;
     const pixelatedCanvas = pixelatedCanvasRef.current;
 
@@ -260,8 +269,6 @@ export default function Home() {
         alert("错误：选定的颜色板为空，无法处理图像。");
         return;
     }
-    // Find T1 or a fallback white/transparent color IN THE CURRENT PALETTE
-    // Prefer T1, then any pure white, then the first color as last resort.
     const t1FallbackColor = currentPalette.find(p => p.key === 'T1')
                          || currentPalette.find(p => p.hex.toUpperCase() === '#FFFFFF')
                          || currentPalette[0];
@@ -289,17 +296,20 @@ export default function Home() {
       const cellWidthOriginal = img.width / N; const cellHeightOriginal = img.height / M;
       const cellWidthOutput = outputWidth / N; const cellHeightOutput = outputHeight / M;
 
-      pixelatedCtx.clearRect(0, 0, outputWidth, outputHeight);
-      console.log("Pixelated canvas cleared. Starting cell processing...");
+      console.log("Starting initial color mapping...");
       let processedCells = 0;
-      const newMappedData: { key: string; color: string }[][] = Array(M).fill(null).map(() => Array(N).fill({ key: t1FallbackColor.key, color: t1FallbackColor.hex }));
+      const initialMappedData: { key: string; color: string }[][] = Array(M).fill(null).map(() => Array(N).fill({ key: t1FallbackColor.key, color: t1FallbackColor.hex }));
 
+      // --- First Loop: Map Colors and Data (using average color) ---
       for (let j = 0; j < M; j++) {
         for (let i = 0; i < N; i++) {
           const startXOriginal = Math.floor(i * cellWidthOriginal);
           const startYOriginal = Math.floor(j * cellHeightOriginal);
-          const currentCellWidth = Math.max(1, Math.min(Math.ceil((i + 1) * cellWidthOriginal), img.width) - startXOriginal);
-          const currentCellHeight = Math.max(1, Math.min(Math.ceil((j + 1) * cellHeightOriginal), img.height) - startYOriginal);
+          // Ensure we don't go past image bounds due to flooring/ceiling
+          const endXOriginal = Math.min(img.width, Math.ceil((i + 1) * cellWidthOriginal));
+          const endYOriginal = Math.min(img.height, Math.ceil((j + 1) * cellHeightOriginal));
+          const currentCellWidth = Math.max(1, endXOriginal - startXOriginal);
+          const currentCellHeight = Math.max(1, endYOriginal - startYOriginal);
 
           if (currentCellWidth <= 0 || currentCellHeight <= 0) { continue; }
 
@@ -308,55 +318,199 @@ export default function Home() {
           catch (e) { console.error(`Failed getImageData at (${i},${j}):`, e); continue; }
 
           const data = imageData.data;
-          const colorCountsInCell: { [key: string]: number } = {};
-          let dominantColorRgb: { r: number; g: number; b: number } = { r:-1, g:-1, b:-1 };
-          let maxCount = 0; let pixelCount = 0;
+          let sumR = 0, sumG = 0, sumB = 0, pixelCount = 0;
 
           for (let p = 0; p < data.length; p += 4) {
-             if (data[p + 3] < 128) continue;
-             const r = data[p]; const g = data[p + 1]; const b = data[p + 2];
-             const colorKey = `${r},${g},${b}`;
-             colorCountsInCell[colorKey] = (colorCountsInCell[colorKey] || 0) + 1;
+             if (data[p + 3] < 128) continue; // Ignore transparent/semi-transparent pixels
+             sumR += data[p];
+             sumG += data[p + 1];
+             sumB += data[p + 2];
              pixelCount++;
-             if (colorCountsInCell[colorKey] > maxCount) {
-               maxCount = colorCountsInCell[colorKey];
-               dominantColorRgb = { r, g, b };
-             }
           }
 
           let finalCellColorData: { key: string; color: string };
-          if (pixelCount > 0 && dominantColorRgb.r !== -1) {
-            const closestBead = findClosestPaletteColor(dominantColorRgb, currentPalette);
+          if (pixelCount > 0) {
+            const avgRgb = { r: Math.round(sumR / pixelCount), g: Math.round(sumG / pixelCount), b: Math.round(sumB / pixelCount) };
+            const closestBead = findClosestPaletteColor(avgRgb, currentPalette);
             finalCellColorData = { key: closestBead.key, color: closestBead.hex };
           } else {
              finalCellColorData = { key: t1FallbackColor.key, color: t1FallbackColor.hex };
           }
 
-          newMappedData[j][i] = finalCellColorData;
-          pixelatedCtx.fillStyle = finalCellColorData.color;
-          const drawX = i * cellWidthOutput; const drawY = j * cellHeightOutput;
-          pixelatedCtx.fillRect(drawX, drawY, cellWidthOutput + 0.5, cellHeightOutput + 0.5);
-
-          pixelatedCtx.strokeStyle = '#EEEEEE'; pixelatedCtx.lineWidth = 1;
-          pixelatedCtx.strokeRect(drawX + 0.5, drawY + 0.5, cellWidthOutput, cellHeightOutput);
+          initialMappedData[j][i] = finalCellColorData;
           processedCells++;
         }
       }
-      setMappedPixelData(newMappedData);
+      console.log(`Initial data mapping complete. Processed ${processedCells} cells. Starting region merging...`);
+
+
+      // --- Region Merging Step ---
+      const keyToRgbMap = new Map<string, { r: number; g: number; b: number }>();
+      currentPalette.forEach(p => keyToRgbMap.set(p.key, p.rgb));
+      const visited: boolean[][] = Array(M).fill(null).map(() => Array(N).fill(false));
+      const mergedData: { key: string; color: string; isExternal: boolean }[][] = Array(M).fill(null).map(() => Array(N).fill({ key: t1FallbackColor.key, color: t1FallbackColor.hex, isExternal: false }));
+      const similarityThresholdValue = threshold;
+
+      for (let j = 0; j < M; j++) {
+        for (let i = 0; i < N; i++) {
+          if (visited[j][i]) continue;
+
+          const startCellData = initialMappedData[j][i];
+          const startRgb = keyToRgbMap.get(startCellData.key);
+
+          if (!startRgb) {
+             console.warn(`RGB not found for key ${startCellData.key} at (${j},${i}) during merging. Skipping cell.`);
+             visited[j][i] = true;
+             mergedData[j][i] = { ...startCellData, isExternal: false};
+             continue;
+          }
+
+          const currentRegionCells: { r: number; c: number }[] = [];
+          const beadKeyCountsInRegion: { [key: string]: number } = {};
+          const queue: { r: number; c: number }[] = [{ r: j, c: i }];
+          visited[j][i] = true;
+
+          while (queue.length > 0) {
+              const { r, c } = queue.shift()!;
+              const currentCellData = initialMappedData[r][c];
+              const currentRgb = keyToRgbMap.get(currentCellData.key);
+
+              if (!currentRgb) {
+                   console.warn(`RGB not found for key ${currentCellData.key} at (${r},${c}) during BFS. Skipping neighbor.`);
+                   continue;
+              }
+
+              const dist = colorDistance(startRgb, currentRgb);
+
+              if (dist < similarityThresholdValue) {
+                  currentRegionCells.push({ r, c });
+                  beadKeyCountsInRegion[currentCellData.key] = (beadKeyCountsInRegion[currentCellData.key] || 0) + 1;
+
+                  const neighbors = [ { nr: r + 1, nc: c }, { nr: r - 1, nc: c }, { nr: r, nc: c + 1 }, { nr: r, nc: c - 1 } ];
+                  for (const { nr, nc } of neighbors) {
+                      if (nr >= 0 && nr < M && nc >= 0 && nc < N && !visited[nr][nc]) {
+                          // Check similarity *before* adding to queue to prevent exploring unrelated branches that happen to be near the start cell
+                          const neighborCellData = initialMappedData[nr][nc];
+                          const neighborRgb = keyToRgbMap.get(neighborCellData.key);
+                          if (neighborRgb && colorDistance(startRgb, neighborRgb) < similarityThresholdValue) {
+                              visited[nr][nc] = true;
+                              queue.push({ r: nr, c: nc });
+                          }
+                      }
+                  }
+              }
+          } // End of while loop (BFS for one region)
+
+          // --- Determine Dominant Color and Recolor the Region ---
+          if (currentRegionCells.length > 0) {
+              let dominantKey = '';
+              let maxCount = 0;
+              for (const key in beadKeyCountsInRegion) {
+                  if (beadKeyCountsInRegion[key] > maxCount) {
+                      maxCount = beadKeyCountsInRegion[key];
+                      dominantKey = key;
+                  }
+              }
+              if (!dominantKey) { // Fallback if region was empty or only had issues
+                  dominantKey = startCellData.key;
+                   console.warn(`No dominant key found for region starting at (${j},${i}), using start cell key: ${dominantKey}`);
+              }
+
+              const dominantColorData = currentPalette.find(p => p.key === dominantKey);
+              if (dominantColorData) {
+                  const dominantColorHex = dominantColorData.hex;
+                  currentRegionCells.forEach(({ r, c }) => {
+                      mergedData[r][c] = { key: dominantKey, color: dominantColorHex, isExternal: false };
+                  });
+              } else {
+                  console.warn(`Dominant key "${dominantKey}" determined but not found in palette. Using fallback.`);
+                   currentRegionCells.forEach(({ r, c }) => {
+                       mergedData[r][c] = { key: t1FallbackColor.key, color: t1FallbackColor.hex, isExternal: false };
+                   });
+              }
+          } else {
+               // If the region only contained the start cell and it had issues
+               mergedData[j][i] = { ...startCellData, isExternal: false };
+          }
+        } // End of inner loop (i)
+      } // End of outer loop (j) for region merging
+      console.log("Region merging complete. Starting background removal.");
+
+
+      // --- Flood Fill: Mark External Background (Uses mergedData) ---
+      const visitedForFloodFill: boolean[][] = Array(M).fill(null).map(() => Array(N).fill(false));
+      const floodFill = (r: number, c: number) => {
+          // ++ Check mergedData for background key and update its isExternal flag ++
+          if (r < 0 || r >= M || c < 0 || c >= N || visitedForFloodFill[r][c] || !BACKGROUND_COLOR_KEYS.includes(mergedData[r][c].key)) {
+              return;
+          }
+          visitedForFloodFill[r][c] = true;
+          mergedData[r][c].isExternal = true; // Mark as external background in mergedData
+          floodFill(r + 1, c);
+          floodFill(r - 1, c);
+          floodFill(r, c + 1);
+          floodFill(r, c - 1);
+      };
+
+      // Start flood fill from all border cells using mergedData
+      for (let i = 0; i < N; i++) {
+          if (!visitedForFloodFill[0][i] && BACKGROUND_COLOR_KEYS.includes(mergedData[0][i].key)) floodFill(0, i);
+          if (!visitedForFloodFill[M - 1][i] && BACKGROUND_COLOR_KEYS.includes(mergedData[M - 1][i].key)) floodFill(M - 1, i);
+      }
+      for (let j = 0; j < M; j++) {
+          if (!visitedForFloodFill[j][0] && BACKGROUND_COLOR_KEYS.includes(mergedData[j][0].key)) floodFill(j, 0);
+          if (!visitedForFloodFill[j][N - 1] && BACKGROUND_COLOR_KEYS.includes(mergedData[j][N - 1].key)) floodFill(j, N - 1);
+      }
+      console.log("Background flood fill marking complete.");
+
+
+      // --- Second Loop: Draw Cells and Borders using mergedData ---
+      console.log("Starting final drawing loop on pixelated canvas...");
+      pixelatedCtx.clearRect(0, 0, outputWidth, outputHeight); // Clear canvas before drawing
+      pixelatedCtx.lineWidth = 1; // Set line width once
+
+      for (let j = 0; j < M; j++) {
+          for (let i = 0; i < N; i++) {
+              // ++ Use mergedData which includes merged colors and isExternal flag ++
+              const cellData = mergedData[j][i];
+              const drawX = i * cellWidthOutput;
+              const drawY = j * cellHeightOutput;
+
+              // Fill the cell background
+              if (cellData.isExternal) {
+                  pixelatedCtx.fillStyle = '#F3F4F6'; // Preview background color for external cells
+              } else {
+                  pixelatedCtx.fillStyle = cellData.color; // Bead color for internal cells
+              }
+              pixelatedCtx.fillRect(drawX, drawY, cellWidthOutput, cellHeightOutput);
+
+              // Draw the border for ALL cells
+              pixelatedCtx.strokeStyle = '#EEEEEE'; // Grid line color
+              pixelatedCtx.strokeRect(drawX + 0.5, drawY + 0.5, cellWidthOutput, cellHeightOutput);
+          }
+      }
+      console.log("Final drawing loop complete.");
+
+
+      // Update state and counts using mergedData (excluding external)
+      setMappedPixelData(mergedData); // Update state with the final processed data
       setGridDimensions({ N, M });
-      console.log(`Pixelation complete: ${N}x${M} grid, processed ${processedCells} cells`);
 
       const counts: { [key: string]: { count: number; color: string } } = {};
-      newMappedData.flat().forEach(cell => {
-        if (cell && cell.key) {
+      // ++ Iterate over mergedData for final counts ++
+      mergedData.flat().forEach(cell => {
+        // Only count cells that are not marked as external background
+        if (cell && cell.key && !cell.isExternal) {
           if (!counts[cell.key]) {
+            // Use the color from mergedData which corresponds to the dominant key
             counts[cell.key] = { count: 0, color: cell.color };
           }
           counts[cell.key].count++;
         }
       });
       setColorCounts(counts);
-      console.log("Color counts updated:", counts);
+      console.log("Color counts updated based on merged data (excluding external background):", counts);
+
     };
     img.onerror = (error: Event | string) => {
       console.error("Image loading failed:", error); alert("无法加载图片。");
@@ -371,15 +525,15 @@ export default function Home() {
     if (originalImageSrc && activeBeadPalette.length > 0) {
        const timeoutId = setTimeout(() => {
          if (originalImageSrc && originalCanvasRef.current && pixelatedCanvasRef.current && activeBeadPalette.length > 0) {
-           console.log("useEffect triggered: Processing image due to src, granularity, or palette change.");
-           pixelateImage(originalImageSrc, granularity, activeBeadPalette);
+           console.log("useEffect triggered: Processing image due to src, granularity, threshold, or palette change.");
+           pixelateImage(originalImageSrc, granularity, similarityThreshold, activeBeadPalette);
          } else {
             console.warn("useEffect check failed: Refs or palette not ready.");
          }
        }, 50);
        return () => clearTimeout(timeoutId);
     }
-  }, [originalImageSrc, granularity, activeBeadPalette]); // Dependency array is correct
+  }, [originalImageSrc, granularity, similarityThreshold, activeBeadPalette]);
 
     // --- Download function (ensure filename includes palette) ---
     const handleDownloadImage = () => {
@@ -394,20 +548,45 @@ export default function Home() {
         const ctx = downloadCanvas.getContext('2d');
         if (!ctx) { console.error("下载失败: 无法创建临时 Canvas Context。"); alert("无法下载图纸。"); return; }
         ctx.imageSmoothingEnabled = false;
+
+        // Set a default background color for the entire canvas (usually white for downloads)
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, downloadWidth, downloadHeight);
+
         console.log(`Generating download grid image: ${downloadWidth}x${downloadHeight}`);
         const fontSize = Math.max(8, Math.floor(downloadCellSize * 0.4));
         ctx.font = `bold ${fontSize}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.lineWidth = 1; // Set line width for borders
 
         for (let j = 0; j < M; j++) {
             for (let i = 0; i < N; i++) {
                 const cellData = mappedPixelData[j][i];
-                const cellColor = cellData?.color || '#FFFFFF'; const cellKey = cellData?.key || '?';
-                const drawX = i * downloadCellSize; const drawY = j * downloadCellSize;
-                ctx.fillStyle = cellColor; ctx.fillRect(drawX, drawY, downloadCellSize, downloadCellSize);
-                ctx.strokeStyle = '#DDDDDD'; ctx.lineWidth = 1;
-                ctx.strokeRect(drawX + 0.5, drawY + 0.5, downloadCellSize -1, downloadCellSize - 1);
-                ctx.fillStyle = getContrastColor(cellColor);
-                ctx.fillText(cellKey, drawX + downloadCellSize / 2, drawY + downloadCellSize / 2);
+                const drawX = i * downloadCellSize;
+                const drawY = j * downloadCellSize;
+
+                // Determine fill color based on whether it's external background
+                if (cellData && !cellData.isExternal) {
+                    // Internal cell: fill with bead color and draw text
+                    const cellColor = cellData.color || '#FFFFFF';
+                    const cellKey = cellData.key || '?';
+
+                    ctx.fillStyle = cellColor;
+                    ctx.fillRect(drawX, drawY, downloadCellSize, downloadCellSize);
+
+                    ctx.fillStyle = getContrastColor(cellColor);
+                    ctx.fillText(cellKey, drawX + downloadCellSize / 2, drawY + downloadCellSize / 2);
+
+                } else {
+                    // External cell: fill with white (or leave transparent if background wasn't filled)
+                    // No text needed for external background
+                    ctx.fillStyle = '#FFFFFF'; // Ensure background cells are white
+                    ctx.fillRect(drawX, drawY, downloadCellSize, downloadCellSize);
+                }
+
+                // ++ Draw border for ALL cells ++
+                ctx.strokeStyle = '#DDDDDD'; // Grid line color for download
+                // Use precise coordinates for sharp lines
+                ctx.strokeRect(drawX + 0.5, drawY + 0.5, downloadCellSize, downloadCellSize);
             }
         }
         try {
@@ -483,20 +662,27 @@ export default function Home() {
         {originalImageSrc && (
           <div className="w-full flex flex-col items-center space-y-5 sm:space-y-6">
             {/* Control Row */}
-            <div className="w-full max-w-md flex flex-col sm:flex-row gap-4 bg-white p-3 sm:p-4 rounded-lg shadow">
+            <div className="w-full max-w-lg grid grid-cols-1 sm:grid-cols-3 gap-4 bg-white p-3 sm:p-4 rounded-lg shadow">
                {/* Granularity Slider */}
                <div className="flex-1">
-                  <label htmlFor="granularity" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+                  <label htmlFor="granularity" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-1.5">
                     横轴格子: <span className="font-semibold text-blue-600">{granularity}</span>
                   </label>
                   <input type="range" id="granularity" min="10" max="100" step="1" value={granularity} onChange={handleGranularityChange} className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600" />
-                  <div className="flex justify-between text-xs text-gray-500 mt-1 px-1"><span>粗</span><span>细</span></div>
+                  <div className="flex justify-between text-xs text-gray-500 mt-0.5 px-1"><span>粗</span><span>细</span></div>
+                </div>
+                {/* ++ Similarity Threshold Slider ++ */}
+                <div className="flex-1">
+                    <label htmlFor="similarityThreshold" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-1.5">
+                        颜色合并: <span className="font-semibold text-purple-600">{similarityThreshold}</span>
+                    </label>
+                    <input type="range" id="similarityThreshold" min="0" max="100" step="1" value={similarityThreshold} onChange={handleSimilarityChange} className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-600" />
+                    <div className="flex justify-between text-xs text-gray-500 mt-0.5 px-1"><span>少</span><span>多</span></div>
                 </div>
                {/* Palette Selector */}
                <div className="flex-1">
-                 <label htmlFor="paletteSelect" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">选择色板:</label>
-                 <select id="paletteSelect" value={selectedPaletteKeySet} onChange={handlePaletteChange} className="w-full p-1.5 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500">
-                   {/* Use Object.entries for potentially better ordering control if needed later */}
+                 <label htmlFor="paletteSelect" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-1.5">选择色板:</label>
+                 <select id="paletteSelect" value={selectedPaletteKeySet} onChange={handlePaletteChange} className="w-full p-1.5 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 h-9"> {/* Adjust height if needed */}
                    {(Object.keys(paletteOptions) as PaletteOptionKey[]).map(key => (
                      <option key={key} value={key}>{paletteOptions[key].name}</option>
                    ))}
@@ -508,7 +694,7 @@ export default function Home() {
             <div className="w-full max-w-2xl">
               <canvas ref={originalCanvasRef} className="hidden"></canvas>
               <div className="bg-white p-3 sm:p-4 rounded-lg shadow">
-                <h2 className="text-base sm:text-lg font-medium mb-3 sm:mb-4 text-center text-gray-800">图纸预览（下载可看色号）</h2>
+                <h2 className="text-base sm:text-lg font-medium mb-3 sm:mb-4 text-center text-gray-800">图纸预览（边缘背景已移除）</h2>
                 <div className="flex justify-center mb-3 sm:mb-4 bg-gray-100 p-2 rounded overflow-hidden" style={{ minHeight: '150px' }}>
                   <canvas ref={pixelatedCanvasRef} className="border border-gray-300 max-w-full h-auto rounded block" style={{ maxHeight: '60vh', imageRendering: 'pixelated' }}></canvas>
                 </div>
