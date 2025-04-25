@@ -300,12 +300,11 @@ export default function Home() {
       let processedCells = 0;
       const initialMappedData: { key: string; color: string }[][] = Array(M).fill(null).map(() => Array(N).fill({ key: t1FallbackColor.key, color: t1FallbackColor.hex }));
 
-      // --- First Loop: Map Colors and Data (using average color) ---
+      // --- First Loop: Map Colors and Data (using DOMINANT color) ---
       for (let j = 0; j < M; j++) {
         for (let i = 0; i < N; i++) {
           const startXOriginal = Math.floor(i * cellWidthOriginal);
           const startYOriginal = Math.floor(j * cellHeightOriginal);
-          // Ensure we don't go past image bounds due to flooring/ceiling
           const endXOriginal = Math.min(img.width, Math.ceil((i + 1) * cellWidthOriginal));
           const endYOriginal = Math.min(img.height, Math.ceil((j + 1) * cellHeightOriginal));
           const currentCellWidth = Math.max(1, endXOriginal - startXOriginal);
@@ -318,30 +317,44 @@ export default function Home() {
           catch (e) { console.error(`Failed getImageData at (${i},${j}):`, e); continue; }
 
           const data = imageData.data;
-          let sumR = 0, sumG = 0, sumB = 0, pixelCount = 0;
+          // ++ Use an object to count color frequencies ++
+          const colorCountsInCell: { [key: string]: number } = {};
+          let dominantColorRgb: { r: number; g: number; b: number } | null = null;
+          let maxCount = 0;
+          let totalPixelCount = 0; // Count valid pixels in the cell
 
+          // ++ Count frequency of each color ++
           for (let p = 0; p < data.length; p += 4) {
              if (data[p + 3] < 128) continue; // Ignore transparent/semi-transparent pixels
-             sumR += data[p];
-             sumG += data[p + 1];
-             sumB += data[p + 2];
-             pixelCount++;
+             const r = data[p];
+             const g = data[p + 1];
+             const b = data[p + 2];
+             const colorKey = `${r},${g},${b}`;
+             colorCountsInCell[colorKey] = (colorCountsInCell[colorKey] || 0) + 1;
+             totalPixelCount++;
+
+             // ++ Keep track of the dominant color found so far ++
+             if (colorCountsInCell[colorKey] > maxCount) {
+               maxCount = colorCountsInCell[colorKey];
+               dominantColorRgb = { r, g, b };
+             }
           }
 
           let finalCellColorData: { key: string; color: string };
-          if (pixelCount > 0) {
-            const avgRgb = { r: Math.round(sumR / pixelCount), g: Math.round(sumG / pixelCount), b: Math.round(sumB / pixelCount) };
-            const closestBead = findClosestPaletteColor(avgRgb, currentPalette);
+          // ++ Map based on dominant color if found, else use fallback ++
+          if (totalPixelCount > 0 && dominantColorRgb) {
+            const closestBead = findClosestPaletteColor(dominantColorRgb, currentPalette);
             finalCellColorData = { key: closestBead.key, color: closestBead.hex };
           } else {
+             // Use fallback if cell was empty or only contained transparent pixels
              finalCellColorData = { key: t1FallbackColor.key, color: t1FallbackColor.hex };
           }
 
-          initialMappedData[j][i] = finalCellColorData;
+          initialMappedData[j][i] = finalCellColorData; // Store in initial data
           processedCells++;
         }
       }
-      console.log(`Initial data mapping complete. Processed ${processedCells} cells. Starting region merging...`);
+      console.log(`Initial data mapping complete (using dominant cell color). Processed ${processedCells} cells. Starting region merging...`);
 
 
       // --- Region Merging Step ---
