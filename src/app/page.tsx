@@ -4,6 +4,7 @@ import React, { useState, useRef, ChangeEvent, DragEvent, TouchEvent, useEffect,
 // Image component from next/image might not be strictly needed if you only use canvas and basic elements,
 // but keep it if you plan to add other images later or use the SVG icon below.
 // Removed unused Image import
+import Script from 'next/script'; // ++ 导入 Script 组件 ++
 
 import beadPaletteData from './beadPaletteData.json';
 
@@ -982,6 +983,51 @@ export default function Home() {
   };
 
   return (
+    <>
+    {/* ++ 修改：添加 onLoad 回调函数 ++ */}
+    <Script
+      async
+      src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"
+      strategy="lazyOnload"
+      onLoad={() => {
+        const basePV = 378536; // ++ 预设 PV 基数 ++
+        const baseUV = 257864; // ++ 预设 UV 基数 ++
+
+        const updateCount = (spanId: string, baseValue: number) => {
+          const targetNode = document.getElementById(spanId);
+          if (!targetNode) return;
+
+          const observer = new MutationObserver((mutationsList) => {
+            for (const mutation of mutationsList) {
+              if (mutation.type === 'childList' || mutation.type === 'characterData') {
+                const currentValueText = targetNode.textContent?.trim() || '0';
+                if (currentValueText !== '...') {
+                  const currentValue = parseInt(currentValueText.replace(/,/g, ''), 10) || 0;
+                  targetNode.textContent = (currentValue + baseValue).toLocaleString();
+                  observer.disconnect(); // ++ 更新后停止观察 ++ 
+                  // console.log(`Updated ${spanId} from ${currentValueText} to ${targetNode.textContent}`);
+                  break; // 处理完第一个有效更新即可
+                }
+              }
+            }
+          });
+
+          observer.observe(targetNode, { childList: true, characterData: true, subtree: true });
+
+          // ++ 处理初始值已经是数字的情况 (如果脚本加载很快) ++
+          const initialValueText = targetNode.textContent?.trim() || '0';
+          if (initialValueText !== '...') {
+             const initialValue = parseInt(initialValueText.replace(/,/g, ''), 10) || 0;
+             targetNode.textContent = (initialValue + baseValue).toLocaleString();
+             observer.disconnect(); // 已更新，无需再观察
+          }
+        };
+
+        updateCount('busuanzi_value_site_pv', basePV);
+        updateCount('busuanzi_value_site_uv', baseUV);
+      }}
+    />
+
     <div className="min-h-screen p-4 sm:p-6 flex flex-col items-center bg-gray-50 font-[family-name:var(--font-geist-sans)]">
       <header className="w-full max-w-4xl text-center mt-6 mb-5 sm:mt-8 sm:mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">拼豆底稿生成器</h1>
@@ -1180,11 +1226,21 @@ export default function Home() {
       </main>
 
       <footer className="w-full max-w-4xl mt-10 mb-6 py-4 text-center text-xs sm:text-sm text-gray-500 border-t border-gray-200">
-        <p>拼豆底稿生成器 &copy; {new Date().getFullYear()}</p>
+        {/* ++ 修改：访问统计分行显示 ++ */}
+        <p>
+          拼豆底稿生成器 &copy; {new Date().getFullYear()}
+        </p>
+        <p id="busuanzi_container_site_pv" className="hidden sm:block mt-1"> {/* 使用 block 替代 inline, 移除 style */}
+          总浏览量 <span id="busuanzi_value_site_pv">...</span >次
+        </p>
+        <p id="busuanzi_container_site_uv" className="hidden sm:block mt-1"> {/* 使用 block 替代 inline, 移除 style */}
+          总访客数 <span id="busuanzi_value_site_uv">...</span >人
+        </p>
         <p className="mt-1">
           <a href="https://github.com/Zippland/perler-beads.git" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline ml-2">有用可以给github项目一个Star</a>
         </p>
       </footer>
     </div>
+   </>
   );
 }
