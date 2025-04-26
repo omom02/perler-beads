@@ -1058,15 +1058,17 @@ export default function Home() {
           <p className="text-xs text-gray-400 mt-1">支持 JPG, PNG 格式</p>
         </div>
         
-        {/* 添加提示信息 */}
-        <div className="w-full md:max-w-md bg-yellow-50 p-3 rounded-lg border border-yellow-200 shadow-sm">
-          <p className="text-xs text-yellow-700 flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 flex-shrink-0 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span>重要提示：使用像素图纸时，请保证图片裁剪的边缘对齐像素格子的边界线，才能正确切割。</span>
-          </p>
-        </div>
+        {/* 添加提示信息 - 只在没有图片预览时显示 */}
+        {!originalImageSrc && (
+          <div className="w-full md:max-w-md bg-gradient-to-r from-blue-50 to-indigo-50 p-3 rounded-lg border border-blue-100 shadow-sm">
+            <p className="text-xs text-indigo-700 flex items-start">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 flex-shrink-0 text-blue-500 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>小贴士：使用像素图进行转换前，请确保图片的边缘吻合像素格子的边界线，这样可以获得更精确的切割效果和更好的成品。</span>
+            </p>
+          </div>
+        )}
 
         <input type="file" accept="image/jpeg, image/png" onChange={handleFileChange} ref={fileInputRef} className="hidden" />
 
