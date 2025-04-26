@@ -18,6 +18,18 @@ import {
 
 import beadPaletteData from './beadPaletteData.json';
 
+// 添加自定义动画样式
+const floatAnimation = `
+  @keyframes float {
+    0% { transform: translateY(0px); }
+    50% { transform: translateY(-5px); }
+    100% { transform: translateY(0px); }
+  }
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+`;
+
 // Helper function to get contrasting text color (simple version) - 保留原有实现，因为未在utils中导出
 function getContrastColor(hex: string): string {
     const rgb = hexToRgb(hex);
@@ -1062,6 +1074,9 @@ export default function Home() {
 
   return (
     <>
+    {/* 添加自定义动画样式 */}
+    <style dangerouslySetInnerHTML={{ __html: floatAnimation }} />
+    
     {/* ++ 修改：添加 onLoad 回调函数 ++ */}
     <Script
       async
@@ -1107,9 +1122,49 @@ export default function Home() {
     />
 
     <div className="min-h-screen p-4 sm:p-6 flex flex-col items-center bg-gradient-to-b from-gray-50 to-white font-[family-name:var(--font-geist-sans)]">
-      <header className="w-full max-w-4xl text-center mt-6 mb-5 sm:mt-8 sm:mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-gray-700 via-gray-900 to-black">拼豆底稿生成器</h1>
-        <p className="mt-2 text-sm sm:text-base text-gray-600">上传图片，选择色板，生成带色号的图纸和统计</p>
+      <header className="w-full max-w-4xl text-center mt-6 mb-8 sm:mt-8 sm:mb-10 relative">
+        {/* 装饰背景圆形 */}
+        <div className="absolute -top-10 -left-24 w-48 h-48 bg-blue-100 rounded-full opacity-30 blur-3xl"></div>
+        <div className="absolute -bottom-10 -right-24 w-48 h-48 bg-pink-100 rounded-full opacity-30 blur-3xl"></div>
+        
+        {/* 装饰点阵图案 - 表示拼豆效果 */}
+        <div className="absolute top-0 right-0 grid grid-cols-5 gap-1 opacity-20">
+          {[...Array(25)].map((_, i) => (
+            <div key={i} className="w-1.5 h-1.5 rounded-full bg-gray-400"></div>
+          ))}
+        </div>
+        <div className="absolute bottom-0 left-0 grid grid-cols-5 gap-1 opacity-20">
+          {[...Array(25)].map((_, i) => (
+            <div key={i} className="w-1.5 h-1.5 rounded-full bg-gray-400"></div>
+          ))}
+        </div>
+        
+        {/* 标题内容 */}
+        <div className="relative z-10 py-6">
+          {/* 拼豆图标 */}
+          <div className="flex justify-center mb-4 animate-float">
+            <div className="grid grid-cols-4 gap-1 p-2 bg-white rounded-xl shadow-lg border border-gray-100">
+              {['bg-red-400', 'bg-blue-400', 'bg-yellow-400', 'bg-green-400', 
+                'bg-purple-400', 'bg-pink-400', 'bg-orange-400', 'bg-teal-400',
+                'bg-indigo-400', 'bg-cyan-400', 'bg-lime-400', 'bg-amber-400',
+                'bg-rose-400', 'bg-sky-400', 'bg-emerald-400', 'bg-violet-400'].map((color, i) => (
+                <div 
+                  key={i} 
+                  className={`w-3 h-3 rounded-full ${color} transition-all duration-500 hover:scale-110 shadow-sm`}
+                  style={{animation: `float ${2 + (i % 3)}s ease-in-out infinite ${i * 0.1}s`}}
+                ></div>
+              ))}
+            </div>
+          </div>
+          
+          <h1 className="text-2xl sm:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-purple-500 to-pink-500 tracking-tight drop-shadow-sm">
+          七卡瓦 拼豆底稿生成器
+          </h1>
+          <div className="h-1 w-24 mx-auto my-3 bg-gradient-to-r from-blue-500 to-pink-500 rounded-full"></div>
+          <p className="mt-3 text-sm sm:text-base text-gray-600 max-w-lg mx-auto leading-relaxed">
+            上传图片，选择色板，生成带色号的图纸和统计
+          </p>
+        </div>
       </header>
 
       <main ref={mainRef} className="w-full max-w-4xl flex flex-col items-center space-y-5 sm:space-y-6 relative"> {/* 添加 relative 定位 */}
@@ -1395,17 +1450,24 @@ export default function Home() {
         </button>
         
         <p className="font-medium text-gray-600">
-          拼豆底稿生成器 &copy; {new Date().getFullYear()}
+          七卡瓦 拼豆底稿生成器 &copy; {new Date().getFullYear()}
         </p>
         
-        <p className="mt-2">
+        <div className="mt-2 flex items-center justify-center gap-4">
           <a href="https://github.com/Zippland/perler-beads.git" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 transition-colors duration-200 hover:underline flex items-center justify-center">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
               <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
             </svg>
-            有用可以给github项目一个Star
+            Github
           </a>
-        </p>
+
+          <a href="https://www.xiaohongshu.com/user/profile/623e8b080000000010007721" target="_blank" rel="noopener noreferrer" className="text-rose-500 hover:text-rose-700 transition-colors duration-200 hover:underline flex items-center justify-center">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 1024 1024" fill="currentColor" className="mr-1">
+              <path d="M512 64C264.6 64 64 264.6 64 512s200.6 448 448 448 448-200.6 448-448S759.4 64 512 64z m238.8 360.2l-57.7 93.3c-10.1 16.3-31.5 21.3-47.8 11.2l-112.4-69.5c-16.3-10.1-21.3-31.5-11.2-47.8l57.7-93.3c10.1-16.3 31.5-21.3 47.8-11.2l112.4 69.5c16.3 10.1 21.3 31.5 11.2 47.8zM448 496l-57.7 93.3c-10.1 16.3-31.5 21.3-47.8 11.2l-112.4-69.5c-16.3-10.1-21.3-31.5-11.2-47.8l57.7-93.3c10.1-16.3 31.5-21.3 47.8-11.2l112.4 69.5c16.3 10.1 21.3 31.5 11.2 47.8z m248.9 43.2l-57.7 93.3c-10.1 16.3-31.5 21.3-47.8 11.2l-112.4-69.5c-16.3-10.1-21.3-31.5-11.2-47.8l57.7-93.3c10.1-16.3 31.5-21.3 47.8-11.2l112.4 69.5c16.3 10.1 21.3 31.5 11.2 47.8z"/>
+            </svg>
+            小红书
+          </a>
+        </div>
       </footer>
 
       {/* 打赏弹窗 - 优化设计 */}
