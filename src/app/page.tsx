@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, ChangeEvent, DragEvent, TouchEvent, useEffect, useMemo } from 'react';
 import Script from 'next/script';
+import Image from 'next/image'; // 添加导入Image组件
 import ColorPalette from '../components/ColorPalette';
 // 导入像素化工具和类型
 import {
@@ -131,6 +132,8 @@ export default function Home() {
   const [remapTrigger, setRemapTrigger] = useState<number>(0);
   const [isManualColoringMode, setIsManualColoringMode] = useState<boolean>(false);
   const [selectedColor, setSelectedColor] = useState<MappedPixel | null>(null);
+  // 新增状态变量：控制打赏弹窗
+  const [isDonationModalOpen, setIsDonationModalOpen] = useState<boolean>(false);
 
   const originalCanvasRef = useRef<HTMLCanvasElement>(null);
   const pixelatedCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -1103,9 +1106,9 @@ export default function Home() {
       }}
     />
 
-    <div className="min-h-screen p-4 sm:p-6 flex flex-col items-center bg-gray-50 font-[family-name:var(--font-geist-sans)]">
+    <div className="min-h-screen p-4 sm:p-6 flex flex-col items-center bg-gradient-to-b from-gray-50 to-white font-[family-name:var(--font-geist-sans)]">
       <header className="w-full max-w-4xl text-center mt-6 mb-5 sm:mt-8 sm:mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">拼豆底稿生成器</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-gray-700 via-gray-900 to-black">拼豆底稿生成器</h1>
         <p className="mt-2 text-sm sm:text-base text-gray-600">上传图片，选择色板，生成带色号的图纸和统计</p>
       </header>
 
@@ -1114,7 +1117,7 @@ export default function Home() {
         <div
           onDrop={handleDrop} onDragOver={handleDragOver} onDragEnter={handleDragOver}
           onClick={() => fileInputRef.current?.click()}
-          className="border-2 border-dashed border-gray-300 rounded-lg p-6 sm:p-8 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors w-full max-w-md flex flex-col justify-center items-center"
+          className="border-2 border-dashed border-gray-300 rounded-lg p-6 sm:p-8 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all duration-300 w-full max-w-md flex flex-col justify-center items-center shadow-sm hover:shadow-md"
           style={{ minHeight: '130px' }}
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 sm:h-12 sm:w-12 text-gray-400 mb-2 sm:mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
@@ -1377,21 +1380,78 @@ export default function Home() {
 
       </main>
 
-      <footer className="w-full max-w-4xl mt-10 mb-6 py-4 text-center text-xs sm:text-sm text-gray-500 border-t border-gray-200">
+      <footer className="w-full max-w-4xl mt-10 mb-6 py-6 text-center text-xs sm:text-sm text-gray-500 border-t border-gray-200 bg-gradient-to-b from-white to-gray-50 rounded-lg shadow-inner">
         {/* ++ 修改：访问统计分行显示 ++ */}
-        <p>
+        
+        {/* 新增打赏按钮 - 移到版权信息前面，样式优化 */}
+        <button
+          onClick={() => setIsDonationModalOpen(true)}
+          className="mb-5 px-6 py-2.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-full shadow-lg transition-all duration-300 hover:shadow-xl hover:translate-y-[-2px] flex items-center justify-center mx-auto"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M9.333 5.833c.736-.277 1.522-.422 2.318-.422.796 0 1.582.145 2.318.422M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          给我点杯奶茶
+        </button>
+        
+        <p className="font-medium text-gray-600">
           拼豆底稿生成器 &copy; {new Date().getFullYear()}
         </p>
-        <p id="busuanzi_container_site_pv" className="hidden sm:block mt-1"> {/* 使用 block 替代 inline, 移除 style */}
-          总浏览量 <span id="busuanzi_value_site_pv">...</span >次
-        </p>
-        <p id="busuanzi_container_site_uv" className="hidden sm:block mt-1"> {/* 使用 block 替代 inline, 移除 style */}
-          总访客数 <span id="busuanzi_value_site_uv">...</span >人
-        </p>
-        <p className="mt-1">
-          <a href="https://github.com/Zippland/perler-beads.git" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline ml-2">有用可以给github项目一个Star</a>
+        
+        <p className="mt-2">
+          <a href="https://github.com/Zippland/perler-beads.git" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 transition-colors duration-200 hover:underline flex items-center justify-center">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
+              <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
+            </svg>
+            有用可以给github项目一个Star
+          </a>
         </p>
       </footer>
+
+      {/* 打赏弹窗 - 优化设计 */}
+      {isDonationModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-all duration-300">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto transform transition-all">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-5">
+                <h3 className="text-xl font-bold text-gray-800 bg-gradient-to-r from-pink-500 to-rose-500 bg-clip-text text-transparent">给我点杯奶茶</h3>
+                <button 
+                  onClick={() => setIsDonationModalOpen(false)}
+                  className="text-gray-500 hover:text-gray-700 transition-colors duration-200"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              <div className="text-center">
+                <p className="mb-4 text-gray-600">
+                  开源项目就是纯粹的为爱发电项目，作者会在工作之余尽力维护，如果您希望这个项目更好，可以让我看到
+                </p>
+                <p className="mb-6 text-gray-600">
+                  每一份都支持是这个项目继续维护的动力。
+                </p>
+                
+                <div className="flex justify-center mb-5">
+                  <div className="relative w-56 h-56 p-2 bg-gradient-to-r from-pink-100 to-rose-100 rounded-lg shadow-md">
+                    <Image 
+                      src="/donation-qr.jpg" 
+                      alt="打赏二维码" 
+                      fill
+                      className="object-contain p-2"
+                    />
+                  </div>
+                </div>
+                
+                <p className="text-sm text-gray-500 bg-gray-50 py-2 px-4 rounded-full inline-block shadow-sm">
+                  扫描上方二维码，给我点杯奶茶。
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
    </>
   );
