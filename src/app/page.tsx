@@ -57,7 +57,7 @@ const palette72Keys = ["A3", "A4", "A6", "A7", "A10", "A11", "A13", "B3", "B5", 
 // const palette24Keys = [...];
 
 const paletteOptions = {
-  'all': { name: `221全实色`, keys: allPaletteKeys },
+  'all': { name: `全色系291色`, keys: allPaletteKeys },
   '168': { name: '168色', keys: palette168Keys },
   '144': { name: '144色', keys: palette144Keys },
   '120': { name: '120色', keys: palette120Keys },
@@ -155,6 +155,7 @@ interface MappedPixel {
 export default function Home() {
   const [originalImageSrc, setOriginalImageSrc] = useState<string | null>(null);
   const [granularity, setGranularity] = useState<number>(50); // Example default
+  const [granularityInput, setGranularityInput] = useState<string>("50"); // ++ 新增：输入框状态 ++
   const [similarityThreshold, setSimilarityThreshold] = useState<number>(30); // Example default for merging
   const [selectedPaletteKeySet, setSelectedPaletteKeySet] = useState<PaletteOptionKey>('all'); // Use 'all' or another valid key
   const [activeBeadPalette, setActiveBeadPalette] = useState<PaletteColor[]>(() => {
@@ -195,6 +196,10 @@ export default function Home() {
     setActiveBeadPalette(newActiveBeadPalette);
   }, [selectedPaletteKeySet, excludedColorKeys, remapTrigger]); // ++ 添加 remapTrigger 依赖 ++
 
+  // ++ 添加：当granularity状态改变时同步更新输入框的值 ++
+  useEffect(() => {
+    setGranularityInput(granularity.toString());
+  }, [granularity]);
 
   // ++ Calculate unique colors currently on the grid for the palette ++
   const currentGridColors = useMemo(() => {
@@ -250,6 +255,10 @@ export default function Home() {
       setColorCounts(null);
       setTotalBeadCount(0);
       setInitialGridColorKeys(null); // ++ 重置初始键 ++
+      // ++ 重置横轴格子数量为默认值 ++
+      const defaultGranularity = 50;
+      setGranularity(defaultGranularity);
+      setGranularityInput(defaultGranularity.toString());
       setRemapTrigger(prev => prev + 1); // Trigger full remap for new image
     };
     reader.onerror = () => {
@@ -263,13 +272,35 @@ export default function Home() {
     setSelectedColor(null);
   };
 
-  const handleGranularityChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const newGranularity = parseInt(event.target.value, 10);
-    setGranularity(newGranularity);
-    setRemapTrigger(prev => prev + 1); // Trigger full remap
-    // ++ Exit manual coloring mode if parameters change ++
-    setIsManualColoringMode(false);
-    setSelectedColor(null);
+  // ++ 新增：处理输入框变化的函数 ++
+  const handleGranularityInputChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setGranularityInput(event.target.value);
+  };
+
+  // ++ 新增：处理确认按钮点击的函数 ++
+  const handleConfirmGranularity = () => {
+    const minGranularity = 10;
+    const maxGranularity = 100;
+    let newGranularity = parseInt(granularityInput, 10);
+
+    if (isNaN(newGranularity) || newGranularity < minGranularity) {
+      newGranularity = minGranularity;
+    } else if (newGranularity > maxGranularity) {
+      newGranularity = maxGranularity;
+    }
+
+    // 只有在值确实改变时才触发更新
+    if (newGranularity !== granularity) {
+      console.log(`Confirming new granularity: ${newGranularity}`);
+      setGranularity(newGranularity); // 更新主状态
+      setRemapTrigger(prev => prev + 1); // 触发重映射
+      // ++ Exit manual coloring mode if parameters change ++
+      setIsManualColoringMode(false);
+      setSelectedColor(null);
+    }
+
+    // 总是将输入框的值同步为验证后的值（避免显示非法值）
+    setGranularityInput(newGranularity.toString());
   };
 
    const handlePaletteChange = (event: ChangeEvent<HTMLSelectElement>) => {
@@ -297,7 +328,7 @@ export default function Home() {
 
   // Core function: Pixelate the image
   const pixelateImage = (imageSrc: string, detailLevel: number, threshold: number, currentPalette: PaletteColor[]) => {
-    console.log(`Attempting to pixelate with threshold: ${threshold}`);
+    console.log(`Attempting to pixelate with detail: ${detailLevel}, threshold: ${threshold}`); // ++ 修改日志，添加detail参数 ++
     const originalCanvas = originalCanvasRef.current;
     const pixelatedCanvas = pixelatedCanvasRef.current;
 
@@ -1202,14 +1233,31 @@ export default function Home() {
             {/* ++ HIDE Control Row in manual mode ++ */}
             {!isManualColoringMode && (
               <div className="w-full max-w-lg grid grid-cols-1 sm:grid-cols-3 gap-4 bg-white p-3 sm:p-4 rounded-lg shadow">
-                 {/* Granularity Slider */}
+                 {/* ++ 修改：Granularity 输入框和按钮 ++ */}
                  <div className="flex-1">
-                    <label htmlFor="granularity" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-1.5">
-                      横轴格子: <span className="font-semibold text-blue-600">{granularity}</span>
-                    </label>
-                    <input type="range" id="granularity" min="10" max="100" step="1" value={granularity} onChange={handleGranularityChange} className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600" />
-                    <div className="flex justify-between text-xs text-gray-500 mt-0.5 px-1"><span>粗</span><span>细</span></div>
-                  </div>
+                   <label htmlFor="granularityInput" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-1.5">
+                     横轴格子 (10-100):
+                   </label>
+                   <div className="flex items-center gap-2">
+                     <input
+                       type="number"
+                       id="granularityInput"
+                       min="10"
+                       max="1000"
+                       step="1"
+                       value={granularityInput}
+                       onChange={handleGranularityInputChange}
+                       onKeyDown={(e) => e.key === 'Enter' && handleConfirmGranularity()}
+                       className="w-full p-1.5 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 h-9"
+                     />
+                     <button
+                       onClick={handleConfirmGranularity}
+                       className="px-3 py-1.5 bg-blue-600 text-white text-xs sm:text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-colors whitespace-nowrap h-9"
+                     >
+                       确认
+                     </button>
+                   </div>
+                 </div>
                   {/* Similarity Threshold Slider */}
                   <div className="flex-1">
                       <label htmlFor="similarityThreshold" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-1.5">
