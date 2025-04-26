@@ -1364,7 +1364,7 @@ export default function Home() {
               
               <div className="text-center">
                 <p className="mb-3 text-sm sm:text-base text-gray-600 break-words">
-                  开源项目就是纯粹的为爱发电项目，作者会在工作之余尽力维护，如果您希望这个项目更好，可以给我点杯奶茶。
+                开源项目是作者和每一个用户共同构建的，如果你希望这个项目变得更好，可以让我看到。
                 </p>
                 <p className="mb-4 sm:mb-6 text-sm sm:text-base text-gray-600 break-words">
                   你的支持是这个项目继续维护的动力。
