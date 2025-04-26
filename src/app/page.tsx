@@ -1351,7 +1351,7 @@ export default function Home() {
           <div className="bg-white rounded-2xl shadow-2xl w-[calc(100vw-2rem)] sm:w-full md:max-w-md max-h-[90vh] overflow-y-auto transform transition-all">
             <div className="p-3 sm:p-6">
               <div className="flex justify-between items-center mb-3 sm:mb-5">
-                <h3 className="text-lg sm:text-xl font-bold text-gray-800 bg-gradient-to-r from-pink-500 to-rose-500 bg-clip-text text-transparent">BuyMeAMilkTea</h3>
+                <h3 className="text-lg sm:text-xl font-bold text-gray-800 bg-gradient-to-r from-pink-500 to-rose-500 bg-clip-text text-transparent font-serif italic" style={{ fontFamily: "'Brush Script MT', cursive, serif" }}>Buy Me A Milk Tea</h3>
                 <button 
                   onClick={() => setIsDonationModalOpen(false)}
                   className="text-gray-500 hover:text-gray-700 transition-colors duration-200"
@@ -1364,7 +1364,7 @@ export default function Home() {
               
               <div className="text-center">
                 <p className="mb-3 text-sm sm:text-base text-gray-600 break-words">
-                  项目开源不易，离不开您的支持，如果你希望这个项目变得更好，可以请我喝一杯奶茶。
+                  算法开源不易，离不开您的支持，如果您希望这个项目变得更好，可以请我喝一杯奶茶。
                 </p>
                 <p className="mb-4 sm:mb-6 text-sm sm:text-base text-gray-600 break-words">
                   您的支持是这个项目继续下去的唯一动力。
