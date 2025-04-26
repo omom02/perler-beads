@@ -254,7 +254,7 @@ export default function Home() {
   // ++ 新增：处理确认按钮点击的函数 ++
   const handleConfirmGranularity = () => {
     const minGranularity = 10;
-    const maxGranularity = 300;
+    const maxGranularity = 200;
     let newGranularity = parseInt(granularityInput, 10);
 
     if (isNaN(newGranularity) || newGranularity < minGranularity) {
@@ -1112,7 +1112,7 @@ export default function Home() {
                 {/* Granularity Input */}
                 <div className="flex-1">
                   <label htmlFor="granularityInput" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
-                    横轴格子 (10-300):
+                    横轴格子 (10-200):
                   </label>
                   <div className="flex items-center gap-2">
                     <input
@@ -1122,7 +1122,7 @@ export default function Home() {
                       onChange={handleGranularityInputChange}
                       className="w-full p-1.5 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 h-9 shadow-sm"
                       min="10"
-                      max="300"
+                      max="200"
                     />
                     <button 
                       onClick={handleConfirmGranularity}
