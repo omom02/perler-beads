@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, ChangeEvent, DragEvent, TouchEvent, useEffect, useMemo } from 'react';
+import React, { useState, useRef, ChangeEvent, DragEvent, useEffect, useMemo } from 'react';
 import Script from 'next/script';
 import Image from 'next/image'; // 添加导入Image组件
 import ColorPalette from '../components/ColorPalette';
@@ -152,8 +152,8 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
   // ++ Re-add touch refs needed for tooltip logic ++
-  const touchStartPosRef = useRef<{ x: number; y: number; pageX: number; pageY: number } | null>(null);
-  const touchMovedRef = useRef<boolean>(false);
+  //const touchStartPosRef = useRef<{ x: number; y: number; pageX: number; pageY: number } | null>(null);
+  //const touchMovedRef = useRef<boolean>(false);
 
   // ++ Add a ref for the main element ++
   const mainRef = useRef<HTMLElement>(null);
@@ -786,52 +786,6 @@ export default function Home() {
     };
 
   // --- Tooltip Logic ---
-
-  // Function to calculate cell and update tooltip
-  const updateTooltip = (clientX: number, clientY: number, pageX: number, pageY: number) => {
-    const canvas = pixelatedCanvasRef.current;
-    if (!canvas || !mappedPixelData || !gridDimensions) {
-      setTooltipData(null);
-      return false; // Indicate failure or no action
-    }
-
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const canvasX = (clientX - rect.left) * scaleX;
-    const canvasY = (clientY - rect.top) * scaleY;
-
-    const { N, M } = gridDimensions;
-    const cellWidthOutput = canvas.width / N;
-    const cellHeightOutput = canvas.height / M;
-
-    const i = Math.floor(canvasX / cellWidthOutput);
-    const j = Math.floor(canvasY / cellHeightOutput);
-
-    if (i >= 0 && i < N && j >= 0 && j < M) {
-      const cellData = mappedPixelData[j][i];
-      if (cellData && !cellData.isExternal && cellData.key) {
-        setTooltipData({
-          x: pageX, // Use page coordinates for positioning
-          y: pageY,
-          key: cellData.key,
-          color: cellData.color,
-        });
-        return true; // Indicate success
-      }
-    }
-
-    setTooltipData(null); // Hide if outside bounds or on background
-    return false;
-  };
-
-  // Clear any active long press timer and hide tooltip
-  const clearLongPress = () => {
-    if (longPressTimerRef.current) {
-      clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
-  };
 
   // --- Canvas Interaction ---
 
