@@ -150,7 +150,7 @@ export default function Home() {
   const originalCanvasRef = useRef<HTMLCanvasElement>(null);
   const pixelatedCanvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
   // ++ Re-add touch refs needed for tooltip logic ++
   //const touchStartPosRef = useRef<{ x: number; y: number; pageX: number; pageY: number } | null>(null);
   //const touchMovedRef = useRef<boolean>(false);
