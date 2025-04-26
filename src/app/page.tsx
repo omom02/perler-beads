@@ -1391,7 +1391,7 @@ export default function Home() {
               
               <div className="text-center">
                 <p className="mb-3 text-sm sm:text-base text-gray-600 break-words">
-                  算法开源不易，离不开您的支持，如果您希望这个项目继续发展，可以请我喝一杯奶茶。
+                  开源社群是作者和用户共同构建的，如果您希望这个项目继续发展，可以请我喝一杯奶茶。
                 </p>
                 <p className="mb-4 sm:mb-6 text-sm sm:text-base text-gray-600 break-words">
                   您的支持是这个项目继续下去的唯一动力。
