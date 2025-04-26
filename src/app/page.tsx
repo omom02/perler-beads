@@ -1172,7 +1172,8 @@ export default function Home() {
                   </button>
                   {/* Color Palette (only in manual mode) */}
                   <div className="mt-4">
-                    <p className="text-xs text-center text-gray-600 mb-2">选择颜色或橡皮擦后，点击下方画布格子进行填充或擦除:</p>
+                    <p className="text-xs text-center text-gray-600 mb-2">选择颜色或橡皮擦后，点击下方画布格子进行填充或擦除。</p>
+                    <p className="text-xs text-center text-gray-600 mb-2">（推荐在电脑上进行上色操作）</p>
                     <ColorPalette
                       colors={[transparentColorData, ...currentGridColors]}
                       selectedColor={selectedColor}
