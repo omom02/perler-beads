@@ -102,6 +102,10 @@ const transparentColorData: MappedPixel = { key: TRANSPARENT_KEY, color: '#FFFFF
 // ++ Add definition for background color keys ++
 const BACKGROUND_COLOR_KEYS = ['T1', 'H1', 'H2']; // 可以根据需要调整
 
+// 1. 导入新组件
+import PixelatedPreviewCanvas from '../components/PixelatedPreviewCanvas';
+import GridTooltip from '../components/GridTooltip';
+
 export default function Home() {
   const [originalImageSrc, setOriginalImageSrc] = useState<string | null>(null);
   const [granularity, setGranularity] = useState<number>(50);
@@ -135,6 +139,9 @@ export default function Home() {
   // ++ Re-add touch refs needed for tooltip logic ++
   const touchStartPosRef = useRef<{ x: number; y: number; pageX: number; pageY: number } | null>(null);
   const touchMovedRef = useRef<boolean>(false);
+
+  // ++ Add a ref for the main element ++
+  const mainRef = useRef<HTMLElement>(null);
 
   // --- Derived State ---
 
@@ -320,6 +327,17 @@ export default function Home() {
     console.log("Using fallback color for empty cells:", t1FallbackColor);
 
     const img = new window.Image();
+    
+    img.onerror = (error: Event | string) => {
+      console.error("Image loading failed:", error); 
+      alert("无法加载图片。");
+      setOriginalImageSrc(null); 
+      setMappedPixelData(null); 
+      setGridDimensions(null); 
+      setColorCounts(null); 
+      setInitialGridColorKeys(null);
+    };
+    
     img.onload = () => {
       console.log("Image loaded successfully.");
       const aspectRatio = img.height / img.width;
@@ -471,42 +489,36 @@ export default function Home() {
 
       // --- 绘制和状态更新 ---
       if (pixelatedCanvasRef.current) {
-        drawPixelatedCanvas(mergedData, pixelatedCanvasRef, { N, M });
+        setMappedPixelData(mergedData);
+        setGridDimensions({ N, M });
+
+        const counts: { [key: string]: { count: number; color: string } } = {};
+        let totalCount = 0;
+        mergedData.flat().forEach(cell => {
+          if (cell && cell.key && !cell.isExternal) {
+            if (!counts[cell.key]) {
+              counts[cell.key] = { count: 0, color: cell.color };
+            }
+            counts[cell.key].count++;
+            totalCount++;
+          }
+        });
+        setColorCounts(counts);
+        setTotalBeadCount(totalCount);
+        setInitialGridColorKeys(new Set(Object.keys(counts)));
+        console.log("Color counts updated based on merged data (excluding external background):", counts);
+        console.log("Total bead count (excluding background):", totalCount);
+        console.log("Stored initial grid color keys:", Object.keys(counts));
       } else {
         console.error("Pixelated canvas ref is null, skipping draw call in pixelateImage.");
       }
-
-      setMappedPixelData(mergedData);
-      setGridDimensions({ N, M });
-
-      const counts: { [key: string]: { count: number; color: string } } = {};
-      let totalCount = 0;
-      mergedData.flat().forEach(cell => {
-        if (cell && cell.key && !cell.isExternal) {
-          if (!counts[cell.key]) {
-            counts[cell.key] = { count: 0, color: cell.color };
-          }
-          counts[cell.key].count++;
-          totalCount++;
-        }
-      });
-      setColorCounts(counts);
-      setTotalBeadCount(totalCount);
-      setInitialGridColorKeys(new Set(Object.keys(counts)));
-      console.log("Color counts updated based on merged data (excluding external background):", counts);
-      console.log("Total bead count (excluding background):", totalCount);
-      console.log("Stored initial grid color keys:", Object.keys(counts));
-    };
-
-    img.onerror = (error: Event | string) => {
-      console.error("Image loading failed:", error); alert("无法加载图片。");
-      setOriginalImageSrc(null); setMappedPixelData(null); setGridDimensions(null); setColorCounts(null); setInitialGridColorKeys(null); // ++ 清空初始键 ++
-    };
+    }; // 正确闭合 img.onload 函数
+    
     console.log("Setting image source...");
     img.src = imageSrc;
     setIsManualColoringMode(false);
     setSelectedColor(null);
-  };
+  }; // 正确闭合 pixelateImage 函数
 
   // 修改useEffect中的pixelateImage调用，加入模式参数
   useEffect(() => {
@@ -737,7 +749,8 @@ export default function Home() {
 
             // ++ 在更新状态后，重新绘制 Canvas ++
             if (pixelatedCanvasRef.current && gridDimensions) { // ++ 添加检查 ++
-              drawPixelatedCanvas(newMappedData, pixelatedCanvasRef, gridDimensions);
+              setMappedPixelData(newMappedData);
+              // 不要调用 setGridDimensions，因为颜色排除不需要改变网格尺寸
             } else {
                console.error("Canvas ref or grid dimensions missing, skipping draw call in handleToggleExcludeColor.");
             }
@@ -883,65 +896,23 @@ export default function Home() {
     touchMovedRef.current = false; // Reset move flag
   };
 
-  // ++ 新增：绘制像素化 Canvas 的函数 ++
-  const drawPixelatedCanvas = (
-      dataToDraw: MappedPixel[][], // ++ Update type here ++
-      canvasRef: React.RefObject<HTMLCanvasElement | null>, // ++ 修改类型定义 ++
-      dims: { N: number; M: number } | null
-  ) => {
-      const canvas = canvasRef.current; // canvas 现在可能是 null
-      if (!canvas || !dims || dims.N <= 0 || dims.M <= 0) { // 这里的 !canvas 检查会处理 null 情况
-          console.warn("无法绘制 Canvas：Ref 为 null、尺寸无效或数据未准备好。");
-          // Optionally clear canvas if dimensions are invalid?
-          const ctx = canvas?.getContext('2d'); // 使用 optional chaining
-          if (ctx && canvas) ctx.clearRect(0, 0, canvas.width, canvas.height);
-          return;
-      }
-      // 从这里开始，我们知道 canvas 不是 null
-      const pixelatedCtx = canvas.getContext('2d');
-      if (!pixelatedCtx) {
-          console.error("无法获取 Pixelated Canvas Context。");
-          return;
-      }
-
-      const { N, M } = dims;
-      const outputWidth = canvas.width; // Use actual canvas size
-      const outputHeight = canvas.height;
-      const cellWidthOutput = outputWidth / N;
-      const cellHeightOutput = outputHeight / M;
-
-      console.log("Redrawing pixelated canvas...");
-      pixelatedCtx.clearRect(0, 0, outputWidth, outputHeight); // 清除旧内容
-      pixelatedCtx.lineWidth = 1; // 设置线宽
-
-      for (let j = 0; j < M; j++) {
-          for (let i = 0; i < N; i++) {
-              const cellData = dataToDraw[j]?.[i]; // Use optional chaining for safety
-              if (!cellData) continue; // Skip if cell data is missing
-
-              const drawX = i * cellWidthOutput;
-              const drawY = j * cellHeightOutput;
-
-              // 填充单元格背景
-              if (cellData.isExternal) {
-                  pixelatedCtx.fillStyle = '#F3F4F6'; // 外部单元格的预览背景色
-              } else {
-                  pixelatedCtx.fillStyle = cellData.color; // 内部单元格的珠子颜色
-              }
-              pixelatedCtx.fillRect(drawX, drawY, cellWidthOutput, cellHeightOutput);
-
-              // 绘制所有单元格的边框
-              pixelatedCtx.strokeStyle = '#EEEEEE'; // 网格线颜色
-              pixelatedCtx.strokeRect(drawX + 0.5, drawY + 0.5, cellWidthOutput, cellHeightOutput);
-          }
-      }
-      console.log("Pixelated canvas redraw complete.");
-  };
-
   // --- Canvas Interaction ---
 
   // ++ Re-introduce the combined interaction handler ++
-  const handleCanvasInteraction = (clientX: number, clientY: number, pageX: number, pageY: number, isClick: boolean = false) => {
+  const handleCanvasInteraction = (
+    clientX: number, 
+    clientY: number, 
+    pageX: number, 
+    pageY: number, 
+    isClick: boolean = false,
+    isTouchEnd: boolean = false
+  ) => {
+    // 如果是触摸结束或鼠标离开事件，隐藏提示
+    if (isTouchEnd) {
+      setTooltipData(null);
+      return;
+    }
+
     const canvas = pixelatedCanvasRef.current;
     if (!canvas || !mappedPixelData || !gridDimensions) {
       setTooltipData(null);
@@ -964,32 +935,27 @@ export default function Home() {
     if (i >= 0 && i < N && j >= 0 && j < M) {
       const cellData = mappedPixelData[j][i];
 
-      // Manual Coloring Logic
+      // Manual Coloring Logic - 保持原有的上色逻辑
       if (isClick && isManualColoringMode && selectedColor) {
-        // ++ Allow clicking on ANY cell (internal or external) ++
-        // Create a deep copy to ensure state update triggers re-render
+        // 手动上色模式逻辑保持不变
+        // ...现有代码...
         const newPixelData = mappedPixelData.map(row => row.map(cell => ({ ...cell })));
-        const currentCell = newPixelData[j]?.[i]; // Get current cell data safely
+        const currentCell = newPixelData[j]?.[i];
 
-        // Check if the color needs changing OR if it was an external cell being colored
-        if (!currentCell) return; // Prevent invalid cells
+        if (!currentCell) return;
 
         const previousKey = currentCell.key;
         const wasExternal = currentCell.isExternal;
         
-        // Determine new cell data
         let newCellData: MappedPixel;
         
-        // Check if using eraser
         if (selectedColor.key === TRANSPARENT_KEY) {
-          // Erasing: Mark as external
           newCellData = { ...transparentColorData };
         } else {
-          // Normal coloring: Apply selected color and mark as internal
           newCellData = { ...selectedColor, isExternal: false };
         }
 
-        // Only update if state actually changes
+        // Only update if state changes
         if (newCellData.key !== previousKey || newCellData.isExternal !== wasExternal) {
           newPixelData[j][i] = newCellData;
           setMappedPixelData(newPixelData);
@@ -999,16 +965,14 @@ export default function Home() {
             const newColorCounts = { ...colorCounts };
             let newTotalCount = totalBeadCount;
 
-            // If previous was internal bead, decrement its count
             if (!wasExternal && previousKey !== TRANSPARENT_KEY && newColorCounts[previousKey]) {
               newColorCounts[previousKey].count--;
               if (newColorCounts[previousKey].count <= 0) {
-                delete newColorCounts[previousKey]; // Remove if count reaches zero
+                delete newColorCounts[previousKey];
               }
               newTotalCount--;
             }
 
-            // If new is internal bead, increment its count
             if (!newCellData.isExternal && newCellData.key !== TRANSPARENT_KEY) {
               if (!newColorCounts[newCellData.key]) {
                 const colorInfo = fullBeadPalette.find(p => p.key === newCellData.key);
@@ -1024,30 +988,72 @@ export default function Home() {
             setColorCounts(newColorCounts);
             setTotalBeadCount(newTotalCount);
           }
-
-          // Immediately redraw canvas
-          if (pixelatedCanvasRef.current) {
-            drawPixelatedCanvas(newPixelData, pixelatedCanvasRef, gridDimensions);
-          }
         }
-        // Clear tooltip after click
+        
+        // 上色操作后隐藏提示
         setTooltipData(null);
       }
-      // Tooltip Logic (only show if NOT a manual coloring click)
-      else if (!isClick || !isManualColoringMode) {
-           if (cellData && !cellData.isExternal && cellData.key) {
-              setTooltipData({
-                x: pageX,
-                y: pageY,
-                key: cellData.key,
-                color: cellData.color,
-              });
-           } else {
-               setTooltipData(null); // Hide tooltip if on background or invalid cell
-           }
+      // Tooltip Logic (非手动上色模式点击或悬停)
+      else if (!isManualColoringMode) {
+        // 只有单元格实际有内容（非背景/外部区域）才会显示提示
+        if (cellData && !cellData.isExternal && cellData.key) {
+          // 检查是否已经显示了提示框，并且是否点击的是同一个位置
+          // 对于移动设备，位置可能有细微偏差，所以我们检查单元格索引而不是具体坐标
+          if (tooltipData) {
+            // 如果已经有提示框，计算当前提示框对应的格子的索引
+            const tooltipRect = canvas.getBoundingClientRect();
+            
+            // 还原提示框位置为相对于canvas的坐标
+            const prevX = tooltipData.x; // 页面X坐标
+            const prevY = tooltipData.y; // 页面Y坐标
+            
+            // 转换为相对于canvas的坐标
+            const prevCanvasX = (prevX - tooltipRect.left) * scaleX;
+            const prevCanvasY = (prevY - tooltipRect.top) * scaleY;
+            
+            // 计算之前显示提示框位置对应的网格索引
+            const prevCellI = Math.floor(prevCanvasX / cellWidthOutput);
+            const prevCellJ = Math.floor(prevCanvasY / cellHeightOutput);
+            
+            // 如果点击的是同一个格子，则切换tooltip的显示/隐藏状态
+            if (i === prevCellI && j === prevCellJ) {
+              setTooltipData(null); // 隐藏提示
+              return;
+            }
+          }
+          
+          // 计算相对于main元素的位置
+          const mainElement = mainRef.current;
+          if (mainElement) {
+            const mainRect = mainElement.getBoundingClientRect();
+            // 计算相对于main元素的坐标
+            const relativeX = pageX - mainRect.left - window.scrollX;
+            const relativeY = pageY - mainRect.top - window.scrollY;
+            
+            // 如果是移动/悬停到一个新的有效格子，或者点击了不同的格子，则显示提示
+            setTooltipData({
+              x: relativeX,
+              y: relativeY,
+              key: cellData.key,
+              color: cellData.color,
+            });
+          } else {
+            // 如果没有找到main元素，使用原始坐标
+            setTooltipData({
+              x: pageX,
+              y: pageY,
+              key: cellData.key,
+              color: cellData.color,
+            });
+          }
+        } else {
+          // 如果点击/悬停在外部区域或背景上，隐藏提示
+          setTooltipData(null);
+        }
       }
     } else {
-      setTooltipData(null); // Hide if outside bounds
+      // 如果点击/悬停在画布外部，隐藏提示
+      setTooltipData(null);
     }
   };
 
@@ -1103,7 +1109,7 @@ export default function Home() {
         <p className="mt-2 text-sm sm:text-base text-gray-600">上传图片，选择色板，生成带色号的图纸和统计</p>
       </header>
 
-      <main className="w-full max-w-4xl flex flex-col items-center space-y-5 sm:space-y-6 relative"> {/* 添加 relative 定位 */}
+      <main ref={mainRef} className="w-full max-w-4xl flex flex-col items-center space-y-5 sm:space-y-6 relative"> {/* 添加 relative 定位 */}
         {/* Drop Zone */}
         <div
           onDrop={handleDrop} onDragOver={handleDragOver} onDragEnter={handleDragOver}
@@ -1235,17 +1241,13 @@ export default function Home() {
               <div className="bg-white p-3 sm:p-4 rounded-lg shadow">
                 <div className="flex justify-center mb-3 sm:mb-4 bg-gray-100 p-2 rounded overflow-hidden"
                      style={{ minHeight: '150px' }}>
-                  <canvas
-                    ref={pixelatedCanvasRef}
-                    onMouseMove={handleCanvasMouseMove}
-                    onMouseLeave={handleCanvasMouseLeave}
-                    onClick={handleCanvasClick}
-                    onTouchStart={handleTouchStart}
-                    onTouchMove={handleTouchMove}
-                    onTouchEnd={handleTouchEnd}
-                    onTouchCancel={handleTouchEnd}
-                    className={`border border-gray-300 max-w-full h-auto rounded block ${isManualColoringMode ? 'cursor-pointer' : 'cursor-crosshair'}`}
-                    style={{ maxHeight: '60vh', imageRendering: 'pixelated' }}
+                  <PixelatedPreviewCanvas
+                    canvasRef={pixelatedCanvasRef}
+                    mappedPixelData={mappedPixelData}
+                    gridDimensions={gridDimensions}
+                    isManualColoringMode={isManualColoringMode}
+                    selectedColor={selectedColor}
+                    onInteraction={handleCanvasInteraction}
                   />
                 </div>
               </div>
@@ -1368,21 +1370,7 @@ export default function Home() {
 
          {/* Tooltip Display (remains the same) */}
          {tooltipData && (
-            <div
-              className="absolute bg-gray-800 text-white text-xs px-2 py-1 rounded shadow-lg pointer-events-none flex items-center space-x-1.5 z-50"
-              style={{
-                left: `${tooltipData.x + 15}px`,
-                top: `${tooltipData.y + 15}px`,
-                transform: 'translate(-50%, -100%)',
-                whiteSpace: 'nowrap',
-              }}
-            >
-               <span
-                 className="inline-block w-3 h-3 rounded-sm border border-gray-400 flex-shrink-0"
-                 style={{ backgroundColor: tooltipData.color }}
-               ></span>
-               <span className="font-mono font-semibold">{tooltipData.key}</span>
-            </div>
+            <GridTooltip tooltipData={tooltipData} />
           )}
 
          {/* Cleaned up the previously moved/commented out block */}
