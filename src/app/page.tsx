@@ -1125,11 +1125,11 @@ export default function Home() {
           <div className="w-full flex flex-col items-center space-y-5 sm:space-y-6">
             {/* ++ HIDE Control Row in manual mode ++ */}
             {!isManualColoringMode && (
-              <div className="w-full max-w-xl grid grid-cols-1 sm:grid-cols-4 gap-4 bg-white p-3 sm:p-4 rounded-lg shadow">
+              <div className="w-full max-w-2xl grid grid-cols-1 sm:grid-cols-4 gap-4 bg-white p-3 sm:p-4 rounded-lg shadow">
                 {/* Granularity Input */}
                 <div className="flex-1">
                   <label htmlFor="granularityInput" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-1.5">
-                    横轴格子 (10-1000):
+                    横轴格子 (10-1k):
                   </label>
                   <div className="flex items-center gap-2">
                     <input
@@ -1151,7 +1151,7 @@ export default function Home() {
                 {/* Similarity Threshold Slider */}
                 <div className="flex-1">
                     <label htmlFor="similarityThreshold" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-1.5">
-                        颜色合并: <span className="font-semibold text-purple-600">{similarityThreshold}</span>
+                        区域颜色合并: <span className="font-semibold text-purple-600">{similarityThreshold}</span>
                     </label>
                     <input
                       type="range"
@@ -1257,9 +1257,9 @@ export default function Home() {
         {!isManualColoringMode && originalImageSrc && colorCounts && Object.keys(colorCounts).length > 0 && (
           <div className="w-full max-w-2xl mt-6 bg-white p-4 rounded-lg shadow">
             <h3 className="text-lg font-semibold mb-1 text-gray-700 text-center">
-              颜色统计与排除 ({paletteOptions[selectedPaletteKeySet]?.name || '未知色板'})
+              颜色统计 & 去除杂色 ({paletteOptions[selectedPaletteKeySet]?.name || '未知色板'})
             </h3>
-            <p className="text-xs text-center text-gray-500 mb-3">点击下方列表中的颜色可将其从可用列表中排除/恢复。总计: {totalBeadCount} 颗</p>
+            <p className="text-xs text-center text-gray-500 mb-3">点击下方列表中的颜色可将其从可用列表中排除。总计: {totalBeadCount} 颗</p>
             <ul className="space-y-1 max-h-60 overflow-y-auto pr-2 text-sm">
               {Object.keys(colorCounts)
                 .sort(sortColorKeys)
