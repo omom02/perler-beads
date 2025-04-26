@@ -1172,8 +1172,30 @@ export default function Home() {
                   </button>
                   {/* Color Palette (only in manual mode) */}
                   <div className="mt-4">
-                    <p className="text-xs text-center text-gray-600 mb-2">选择颜色或橡皮擦后，点击下方画布格子进行填充或擦除。</p>
-                    <p className="text-xs text-center text-gray-600 mb-2">（推荐使用电脑进行上色操作）</p>
+                    <div className="flex justify-center mb-3">
+                      <div className="bg-blue-50 border border-blue-100 rounded-lg p-2 flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 text-xs text-gray-600 w-full sm:w-auto">
+                        <div className="flex items-center gap-1 w-full sm:w-auto">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                          </svg>
+                          <span>选择颜色/橡皮擦，点击画布格子上色</span>
+                        </div>
+                        <span className="hidden sm:inline text-gray-300">|</span>
+                        <div className="flex items-center gap-1 w-full sm:w-auto">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          <span>为避免误触，推荐使用电脑</span>
+                        </div>
+                        <span className="hidden sm:inline text-gray-300">|</span>
+                        <div className="flex items-center gap-1 w-full sm:w-auto">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                          </svg>
+                          <span>Ctrl/Cmd+滚轮缩放</span>
+                        </div>
+                      </div>
+                    </div>
                     <ColorPalette
                       colors={[transparentColorData, ...currentGridColors]}
                       selectedColor={selectedColor}

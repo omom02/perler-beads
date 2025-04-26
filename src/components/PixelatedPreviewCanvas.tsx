@@ -174,7 +174,6 @@ const PixelatedPreviewCanvas: React.FC<PixelatedPreviewCanvasProps> = ({
         isManualColoringMode ? 'cursor-pointer' : 'cursor-crosshair'
       }`}
       style={{ 
-        maxHeight: '60vh', 
         imageRendering: 'pixelated', 
         touchAction: 'none' // 防止触摸时页面滚动
       }}
