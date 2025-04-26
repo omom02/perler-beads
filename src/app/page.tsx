@@ -1,37 +1,50 @@
 'use client';
 
 import React, { useState, useRef, ChangeEvent, DragEvent, TouchEvent, useEffect, useMemo } from 'react';
-// Image component from next/image might not be strictly needed if you only use canvas and basic elements,
-// but keep it if you plan to add other images later or use the SVG icon below.
-// Removed unused Image import
-import Script from 'next/script'; // ++ 导入 Script 组件 ++
+import Script from 'next/script';
 import ColorPalette from '../components/ColorPalette';
+// 导入像素化工具和类型
+import {
+  PixelationMode,
+  calculatePixelGrid,
+  RgbColor,
+  PaletteColor,
+  MappedPixel,
+  hexToRgb,
+  colorDistance,
+  findClosestPaletteColor
+} from '../utils/pixelation';
 
 import beadPaletteData from './beadPaletteData.json';
 
-// Helper function to convert Hex to RGB
-function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  return result ? {
-    r: parseInt(result[1], 16),
-    g: parseInt(result[2], 16),
-    b: parseInt(result[3], 16)
-  } : null;
+// Helper function to get contrasting text color (simple version) - 保留原有实现，因为未在utils中导出
+function getContrastColor(hex: string): string {
+    const rgb = hexToRgb(hex);
+    if (!rgb) return '#000000'; // Default to black
+    // Simple brightness check (Luma formula Y = 0.2126 R + 0.7152 G + 0.0722 B)
+    const luma = (0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b) / 255;
+    return luma > 0.5 ? '#000000' : '#FFFFFF'; // Dark background -> white text, Light background -> black text
 }
 
-// Helper function to calculate Euclidean distance in RGB space
-function colorDistance(rgb1: { r: number; g: number; b: number }, rgb2: { r: number; g: number; b: number }): number {
-  const dr = rgb1.r - rgb2.r;
-  const dg = rgb1.g - rgb2.g;
-  const db = rgb1.b - rgb2.b;
-  return Math.sqrt(dr * dr + dg * dg + db * db);
-}
+// Helper function for sorting color keys - 保留原有实现，因为未在utils中导出
+function sortColorKeys(a: string, b: string): number {
+  const regex = /^([A-Z]+)(\d+)$/;
+  const matchA = a.match(regex);
+  const matchB = b.match(regex);
 
-// Interface for our palette colors
-interface PaletteColor {
-  key: string;
-  hex: string;
-  rgb: { r: number; g: number; b: number };
+  if (matchA && matchB) {
+    const prefixA = matchA[1];
+    const numA = parseInt(matchA[2], 10);
+    const prefixB = matchB[1];
+    const numB = parseInt(matchB[2], 10);
+
+    if (prefixA !== prefixB) {
+      return prefixA.localeCompare(prefixB); // Sort by prefix first (A, B, C...)
+    }
+    return numA - numB; // Then sort by number (1, 2, 10...)
+  }
+  // Fallback for keys that don't match the standard pattern (e.g., T1, ZG1)
+  return a.localeCompare(b);
 }
 
 // --- Define available palette key sets ---
@@ -89,75 +102,14 @@ const transparentColorData: MappedPixel = { key: TRANSPARENT_KEY, color: '#FFFFF
 // ++ Add definition for background color keys ++
 const BACKGROUND_COLOR_KEYS = ['T1', 'H1', 'H2']; // 可以根据需要调整
 
-// Helper function to find the closest color in the *selected* palette
-function findClosestPaletteColor(
-    avgRgb: { r: number; g: number; b: number },
-    palette: PaletteColor[]
-): PaletteColor {
-    let minDistance = Infinity;
-    let closestColor = palette[0];
-
-    if (!closestColor) {
-        console.error("Selected bead palette is empty or invalid!");
-        const t1Fallback = fullBeadPalette.find(p => p.key === 'T1');
-        const blackFallback = fullBeadPalette.find(p => p.hex === '#000000') || { key: 'ERR', hex: '#000000', rgb: { r: 0, g: 0, b: 0 } };
-        return t1Fallback || blackFallback;
-    }
-
-    for (const paletteColor of palette) {
-        const distance = colorDistance(avgRgb, paletteColor.rgb);
-        if (distance < minDistance) {
-            minDistance = distance;
-            closestColor = paletteColor;
-        }
-        if (distance === 0) break;
-    }
-    return closestColor;
-}
-
-// Helper to get contrasting text color (simple version)
-function getContrastColor(hex: string): string {
-    const rgb = hexToRgb(hex);
-    if (!rgb) return '#000000'; // Default to black
-    // Simple brightness check (Luma formula Y = 0.2126 R + 0.7152 G + 0.0722 B)
-    const luma = (0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b) / 255;
-    return luma > 0.5 ? '#000000' : '#FFFFFF'; // Dark background -> white text, Light background -> black text
-}
-
-// Helper function for sorting color keys (e.g., A1, A2, A10, B1)
-function sortColorKeys(a: string, b: string): number {
-  const regex = /^([A-Z]+)(\d+)$/;
-  const matchA = a.match(regex);
-  const matchB = b.match(regex);
-
-  if (matchA && matchB) {
-    const prefixA = matchA[1];
-    const numA = parseInt(matchA[2], 10);
-    const prefixB = matchB[1];
-    const numB = parseInt(matchB[2], 10);
-
-    if (prefixA !== prefixB) {
-      return prefixA.localeCompare(prefixB); // Sort by prefix first (A, B, C...)
-    }
-    return numA - numB; // Then sort by number (1, 2, 10...)
-  }
-  // Fallback for keys that don't match the standard pattern (e.g., T1, ZG1)
-  return a.localeCompare(b);
-}
-
-// ++ Interface for mapped pixel data needs updating ++
-interface MappedPixel {
-  key: string;
-  color: string;
-  isExternal?: boolean; // Keep this optional or ensure it's always present
-}
-
 export default function Home() {
   const [originalImageSrc, setOriginalImageSrc] = useState<string | null>(null);
-  const [granularity, setGranularity] = useState<number>(50); // Example default
-  const [granularityInput, setGranularityInput] = useState<string>("50"); // ++ 新增：输入框状态 ++
-  const [similarityThreshold, setSimilarityThreshold] = useState<number>(30); // Example default for merging
-  const [selectedPaletteKeySet, setSelectedPaletteKeySet] = useState<PaletteOptionKey>('all'); // Use 'all' or another valid key
+  const [granularity, setGranularity] = useState<number>(50);
+  const [granularityInput, setGranularityInput] = useState<string>("50");
+  const [similarityThreshold, setSimilarityThreshold] = useState<number>(30);
+  // 添加像素化模式状态
+  const [pixelationMode, setPixelationMode] = useState<PixelationMode>(PixelationMode.Dominant); // 默认为卡通模式
+  const [selectedPaletteKeySet, setSelectedPaletteKeySet] = useState<PaletteOptionKey>('all');
   const [activeBeadPalette, setActiveBeadPalette] = useState<PaletteColor[]>(() => {
       const initialKey = 'all'; // Match the key used above
       const options = paletteOptions[initialKey];
@@ -325,10 +277,22 @@ export default function Home() {
     setSelectedColor(null);
   };
 
+  // 添加像素化模式切换处理函数
+  const handlePixelationModeChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    const newMode = event.target.value as PixelationMode;
+    if (Object.values(PixelationMode).includes(newMode)) {
+        setPixelationMode(newMode);
+        setRemapTrigger(prev => prev + 1); // 触发重新映射
+        setIsManualColoringMode(false); // 退出手动模式
+        setSelectedColor(null);
+    } else {
+        console.warn(`无效的像素化模式: ${newMode}`);
+    }
+  };
 
-  // Core function: Pixelate the image
-  const pixelateImage = (imageSrc: string, detailLevel: number, threshold: number, currentPalette: PaletteColor[]) => {
-    console.log(`Attempting to pixelate with detail: ${detailLevel}, threshold: ${threshold}`); // ++ 修改日志，添加detail参数 ++
+  // 修改pixelateImage函数接收模式参数
+  const pixelateImage = (imageSrc: string, detailLevel: number, threshold: number, currentPalette: PaletteColor[], mode: PixelationMode) => {
+    console.log(`Attempting to pixelate with detail: ${detailLevel}, threshold: ${threshold}, mode: ${mode}`);
     const originalCanvas = originalCanvasRef.current;
     const pixelatedCanvas = pixelatedCanvasRef.current;
 
@@ -352,7 +316,7 @@ export default function Home() {
     }
     const t1FallbackColor = currentPalette.find(p => p.key === 'T1')
                          || currentPalette.find(p => p.hex.toUpperCase() === '#FFFFFF')
-                         || currentPalette[0]; // Use the first available color as fallback
+                         || currentPalette[0]; // 使用第一个可用颜色作为备用
     console.log("Using fallback color for empty cells:", t1FallbackColor);
 
     const img = new window.Image();
@@ -373,75 +337,25 @@ export default function Home() {
       originalCtx.drawImage(img, 0, 0, img.width, img.height);
       console.log("Original image drawn.");
 
-      const cellWidthOriginal = img.width / N; const cellHeightOriginal = img.height / M;
-      // const cellWidthOutput = outputWidth / N; const cellHeightOutput = outputHeight / M; // ++ REMOVED unused variables ++
-
-      console.log("Starting initial color mapping...");
-      let processedCells = 0;
-      const initialMappedData: { key: string; color: string }[][] = Array(M).fill(null).map(() => Array(N).fill({ key: t1FallbackColor.key, color: t1FallbackColor.hex }));
-
-      // --- First Loop: Map Colors and Data (using DOMINANT color) ---
-      for (let j = 0; j < M; j++) {
-        for (let i = 0; i < N; i++) {
-          const startXOriginal = Math.floor(i * cellWidthOriginal);
-          const startYOriginal = Math.floor(j * cellHeightOriginal);
-          const endXOriginal = Math.min(img.width, Math.ceil((i + 1) * cellWidthOriginal));
-          const endYOriginal = Math.min(img.height, Math.ceil((j + 1) * cellHeightOriginal));
-          const currentCellWidth = Math.max(1, endXOriginal - startXOriginal);
-          const currentCellHeight = Math.max(1, endYOriginal - startYOriginal);
-
-          if (currentCellWidth <= 0 || currentCellHeight <= 0) { continue; }
-
-          let imageData;
-          try { imageData = originalCtx.getImageData(startXOriginal, startYOriginal, currentCellWidth, currentCellHeight); }
-          catch (e) { console.error(`Failed getImageData at (${i},${j}):`, e); continue; }
-
-          const data = imageData.data;
-          // ++ Use an object to count color frequencies ++
-          const colorCountsInCell: { [key: string]: number } = {};
-          let dominantColorRgb: { r: number; g: number; b: number } | null = null;
-          let maxCount = 0;
-          let totalPixelCount = 0; // Count valid pixels in the cell
-
-          // ++ Count frequency of each color ++
-          for (let p = 0; p < data.length; p += 4) {
-             if (data[p + 3] < 128) continue; // Ignore transparent/semi-transparent pixels
-             const r = data[p];
-             const g = data[p + 1];
-             const b = data[p + 2];
-             const colorKey = `${r},${g},${b}`;
-             colorCountsInCell[colorKey] = (colorCountsInCell[colorKey] || 0) + 1;
-             totalPixelCount++;
-
-             // ++ Keep track of the dominant color found so far ++
-             if (colorCountsInCell[colorKey] > maxCount) {
-               maxCount = colorCountsInCell[colorKey];
-               dominantColorRgb = { r, g, b };
-             }
-          }
-
-          let finalCellColorData: { key: string; color: string };
-          // ++ Map based on dominant color if found, else use fallback ++
-          if (totalPixelCount > 0 && dominantColorRgb) {
-            const closestBead = findClosestPaletteColor(dominantColorRgb, currentPalette);
-            finalCellColorData = { key: closestBead.key, color: closestBead.hex };
-          } else {
-             // Use fallback if cell was empty or only contained transparent pixels
-             finalCellColorData = { key: t1FallbackColor.key, color: t1FallbackColor.hex };
-          }
-
-          initialMappedData[j][i] = finalCellColorData; // Store in initial data
-          processedCells++;
-        }
-      }
-      console.log(`Initial data mapping complete (using dominant cell color). Processed ${processedCells} cells. Starting region merging...`);
-
+      // 使用calculatePixelGrid替换原来的颜色映射逻辑
+      console.log("Starting initial color mapping using calculatePixelGrid...");
+      const initialMappedData = calculatePixelGrid(
+          originalCtx,
+          img.width,
+          img.height,
+          N,
+          M,
+          currentPalette, 
+          mode,
+          t1FallbackColor
+      );
+      console.log(`Initial data mapping complete using mode ${mode}. Starting region merging...`);
 
       // --- Region Merging Step ---
-      const keyToRgbMap = new Map<string, { r: number; g: number; b: number }>();
+      const keyToRgbMap = new Map<string, RgbColor>();
       currentPalette.forEach(p => keyToRgbMap.set(p.key, p.rgb));
       const visited: boolean[][] = Array(M).fill(null).map(() => Array(N).fill(false));
-      const mergedData: { key: string; color: string; isExternal: boolean }[][] = Array(M).fill(null).map(() => Array(N).fill({ key: t1FallbackColor.key, color: t1FallbackColor.hex, isExternal: false }));
+      const mergedData: MappedPixel[][] = Array(M).fill(null).map(() => Array(N).fill({ key: t1FallbackColor.key, color: t1FallbackColor.hex, isExternal: false }));
       const similarityThresholdValue = threshold;
 
       for (let j = 0; j < M; j++) {
@@ -452,10 +366,10 @@ export default function Home() {
           const startRgb = keyToRgbMap.get(startCellData.key);
 
           if (!startRgb) {
-             console.warn(`RGB not found for key ${startCellData.key} at (${j},${i}) during merging (might be excluded?). Using fallback for this cell.`);
+             console.warn(`RGB not found for key ${startCellData.key} at (${j},${i}) during merging. Using fallback.`);
              visited[j][i] = true;
              mergedData[j][i] = { key: t1FallbackColor.key, color: t1FallbackColor.hex, isExternal: false };
-             continue; // Skip BFS starting from this invalid cell
+             continue;
           }
 
           const currentRegionCells: { r: number; c: number }[] = [];
@@ -469,7 +383,7 @@ export default function Home() {
               const currentRgb = keyToRgbMap.get(currentCellData.key);
 
               if (!currentRgb) {
-                   console.warn(`RGB not found for key ${currentCellData.key} at (${r},${c}) during BFS. Skipping neighbor.`);
+                   console.warn(`RGB not found for key ${currentCellData.key} at (${r},${c}) during BFS. Skipping.`);
                    continue;
               }
 
@@ -482,7 +396,6 @@ export default function Home() {
                   const neighbors = [ { nr: r + 1, nc: c }, { nr: r - 1, nc: c }, { nr: r, nc: c + 1 }, { nr: r, nc: c - 1 } ];
                   for (const { nr, nc } of neighbors) {
                       if (nr >= 0 && nr < M && nc >= 0 && nc < N && !visited[nr][nc]) {
-                          // Check similarity *before* adding to queue to prevent exploring unrelated branches that happen to be near the start cell
                           const neighborCellData = initialMappedData[nr][nc];
                           const neighborRgb = keyToRgbMap.get(neighborCellData.key);
                           if (neighborRgb && colorDistance(startRgb, neighborRgb) < similarityThresholdValue) {
@@ -492,7 +405,7 @@ export default function Home() {
                       }
                   }
               }
-          } // End of while loop (BFS for one region)
+          }
 
           // --- Determine Dominant Color and Recolor the Region ---
           if (currentRegionCells.length > 0) {
@@ -504,9 +417,9 @@ export default function Home() {
                       dominantKey = key;
                   }
               }
-              if (!dominantKey) { // Fallback if region was empty or only had issues
+              if (!dominantKey) {
                   dominantKey = startCellData.key;
-                   console.warn(`No dominant key found for region starting at (${j},${i}), using start cell key: ${dominantKey}`);
+                  console.warn(`No dominant key found for region starting at (${j},${i}), using start cell key: ${dominantKey}`);
               }
 
               const dominantColorData = currentPalette.find(p => p.key === dominantKey);
@@ -516,112 +429,92 @@ export default function Home() {
                       mergedData[r][c] = { key: dominantKey, color: dominantColorHex, isExternal: false };
                   });
               } else {
-                  console.warn(`Dominant key "${dominantKey}" determined but not found in *active* palette during merge. Using fallback.`);
+                   console.warn(`Dominant key "${dominantKey}" determined but not found in *active* palette during merge. Using fallback.`);
                    currentRegionCells.forEach(({ r, c }) => {
                        mergedData[r][c] = { key: t1FallbackColor.key, color: t1FallbackColor.hex, isExternal: false };
                    });
               }
           } else {
-               // If the region only contained the start cell and it had issues
-               mergedData[j][i] = { ...startCellData, isExternal: false };
+              mergedData[j][i] = { ...startCellData, isExternal: false };
           }
-        } // End of inner loop (i)
-      } // End of outer loop (j) for region merging
+        }
+      }
+      
       console.log("Region merging complete. Starting background removal.");
 
-
-      // --- Flood Fill: Mark External Background (Uses mergedData) ---
+      // --- Flood Fill Background Process ---
+      // ... 保持洪水填充算法不变，但在mergedData上操作 ...
       const visitedForFloodFill: boolean[][] = Array(M).fill(null).map(() => Array(N).fill(false));
+
       const floodFill = (r: number, c: number) => {
-          // ++ Check mergedData for background key and update its isExternal flag ++
-          if (r < 0 || r >= M || c < 0 || c >= N || visitedForFloodFill[r][c] || !BACKGROUND_COLOR_KEYS.includes(mergedData[r][c].key)) {
+          const cell = mergedData[r]?.[c];
+          if (r < 0 || r >= M || c < 0 || c >= N || visitedForFloodFill[r][c] || !cell || !BACKGROUND_COLOR_KEYS.includes(cell.key)) {
               return;
           }
           visitedForFloodFill[r][c] = true;
-          mergedData[r][c].isExternal = true; // Mark as external background in mergedData
+          cell.isExternal = true;
           floodFill(r + 1, c);
           floodFill(r - 1, c);
           floodFill(r, c + 1);
           floodFill(r, c - 1);
       };
 
-      // Start flood fill from all border cells using mergedData
       for (let i = 0; i < N; i++) {
-          if (!visitedForFloodFill[0][i] && BACKGROUND_COLOR_KEYS.includes(mergedData[0][i].key)) floodFill(0, i);
-          if (!visitedForFloodFill[M - 1][i] && BACKGROUND_COLOR_KEYS.includes(mergedData[M - 1][i].key)) floodFill(M - 1, i);
+          if (!visitedForFloodFill[0][i] && mergedData[0]?.[i] && BACKGROUND_COLOR_KEYS.includes(mergedData[0][i].key)) floodFill(0, i);
+          if (!visitedForFloodFill[M - 1][i] && mergedData[M - 1]?.[i] && BACKGROUND_COLOR_KEYS.includes(mergedData[M - 1][i].key)) floodFill(M - 1, i);
       }
       for (let j = 0; j < M; j++) {
-          if (!visitedForFloodFill[j][0] && BACKGROUND_COLOR_KEYS.includes(mergedData[j][0].key)) floodFill(j, 0);
-          if (!visitedForFloodFill[j][N - 1] && BACKGROUND_COLOR_KEYS.includes(mergedData[j][N - 1].key)) floodFill(j, N - 1);
+          if (!visitedForFloodFill[j][0] && mergedData[j]?.[0] && BACKGROUND_COLOR_KEYS.includes(mergedData[j][0].key)) floodFill(j, 0);
+          if (!visitedForFloodFill[j][N - 1] && mergedData[j]?.[N - 1] && BACKGROUND_COLOR_KEYS.includes(mergedData[j][N - 1].key)) floodFill(j, N - 1);
       }
       console.log("Background flood fill marking complete.");
 
-
-      // --- Second Loop: Draw Cells and Borders using mergedData ---
-      // console.log("Starting final drawing loop on pixelated canvas..."); // ++ 移除日志 ++
-      // pixelatedCtx.clearRect(0, 0, outputWidth, outputHeight); // Clear canvas before drawing // ++ 移除 ++
-      // pixelatedCtx.lineWidth = 1; // Set line width once // ++ 移除 ++
-      /* ++ 移除整个绘制循环 ++
-      for (let j = 0; j < M; j++) {
-          for (let i = 0; i < N; i++) {
-              // ... (original drawing code) ...
-          }
-      }
-      */
-      // console.log("Final drawing loop complete."); // ++ 移除日志 ++
-
-      // ++ 在设置状态之前调用新的绘制函数 ++
-      if (pixelatedCanvasRef.current) { // ++ 添加检查 ++
+      // --- 绘制和状态更新 ---
+      if (pixelatedCanvasRef.current) {
         drawPixelatedCanvas(mergedData, pixelatedCanvasRef, { N, M });
       } else {
         console.error("Pixelated canvas ref is null, skipping draw call in pixelateImage.");
       }
 
-      // Update state and counts using mergedData (excluding external)
       setMappedPixelData(mergedData);
       setGridDimensions({ N, M });
 
       const counts: { [key: string]: { count: number; color: string } } = {};
-      let totalCount = 0; // ++ 初始化总数计数器 ++
-      // ++ Iterate over mergedData for final counts ++
+      let totalCount = 0;
       mergedData.flat().forEach(cell => {
-        // Only count cells that are not marked as external background
         if (cell && cell.key && !cell.isExternal) {
           if (!counts[cell.key]) {
-            // Use the color from mergedData which corresponds to the dominant key
             counts[cell.key] = { count: 0, color: cell.color };
           }
           counts[cell.key].count++;
-          totalCount++; // ++ 累加总数 ++
+          totalCount++;
         }
       });
       setColorCounts(counts);
-      setTotalBeadCount(totalCount); // ++ 更新总数状态 ++
-      setInitialGridColorKeys(new Set(Object.keys(counts))); // ++ 存储初始颜色键 ++
+      setTotalBeadCount(totalCount);
+      setInitialGridColorKeys(new Set(Object.keys(counts)));
       console.log("Color counts updated based on merged data (excluding external background):", counts);
-      console.log("Total bead count (excluding background):", totalCount); // ++ 打印总数 ++
-      console.log("Stored initial grid color keys:", Object.keys(counts)); // ++ 记录初始键日志 ++
-
+      console.log("Total bead count (excluding background):", totalCount);
+      console.log("Stored initial grid color keys:", Object.keys(counts));
     };
+
     img.onerror = (error: Event | string) => {
       console.error("Image loading failed:", error); alert("无法加载图片。");
       setOriginalImageSrc(null); setMappedPixelData(null); setGridDimensions(null); setColorCounts(null); setInitialGridColorKeys(null); // ++ 清空初始键 ++
     };
     console.log("Setting image source...");
     img.src = imageSrc;
-    // Ensure manual mode is off after pixelation completes
     setIsManualColoringMode(false);
     setSelectedColor(null);
   };
 
-  // Use useEffect to trigger pixelation
+  // 修改useEffect中的pixelateImage调用，加入模式参数
   useEffect(() => {
-    if (originalImageSrc && activeBeadPalette.length > 0) { // Keep activeBeadPalette check here to prevent running if empty
+    if (originalImageSrc && activeBeadPalette.length > 0) {
        const timeoutId = setTimeout(() => {
-         // Add internal check for activeBeadPalette length again just before calling pixelate
          if (originalImageSrc && originalCanvasRef.current && pixelatedCanvasRef.current && activeBeadPalette.length > 0) {
-           console.log("useEffect triggered: Processing image due to src, granularity, threshold, palette selection, or remap trigger.");
-           pixelateImage(originalImageSrc, granularity, similarityThreshold, activeBeadPalette); // Pass activeBeadPalette here
+           console.log("useEffect triggered: Processing image due to src, granularity, threshold, palette selection, mode or remap trigger.");
+           pixelateImage(originalImageSrc, granularity, similarityThreshold, activeBeadPalette, pixelationMode);
          } else {
             console.warn("useEffect check failed inside timeout: Refs or active palette not ready/empty.");
          }
@@ -646,7 +539,7 @@ export default function Home() {
         // setTotalBeadCount(0);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [originalImageSrc, granularity, similarityThreshold, selectedPaletteKeySet, remapTrigger]); // Dependencies controlling full remap
+  }, [originalImageSrc, granularity, similarityThreshold, selectedPaletteKeySet, pixelationMode, remapTrigger]); // 添加pixelationMode到依赖数组
 
     // --- Download function (ensure filename includes palette) ---
     const handleDownloadImage = () => {
@@ -1232,49 +1125,77 @@ export default function Home() {
           <div className="w-full flex flex-col items-center space-y-5 sm:space-y-6">
             {/* ++ HIDE Control Row in manual mode ++ */}
             {!isManualColoringMode && (
-              <div className="w-full max-w-lg grid grid-cols-1 sm:grid-cols-3 gap-4 bg-white p-3 sm:p-4 rounded-lg shadow">
-                 {/* ++ 修改：Granularity 输入框和按钮 ++ */}
-                 <div className="flex-1">
-                   <label htmlFor="granularityInput" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-1.5">
-                     横轴格子 (10-100):
-                   </label>
-                   <div className="flex items-center gap-2">
-                     <input
-                       type="number"
-                       id="granularityInput"
-                       min="10"
-                       max="1000"
-                       step="1"
-                       value={granularityInput}
-                       onChange={handleGranularityInputChange}
-                       onKeyDown={(e) => e.key === 'Enter' && handleConfirmGranularity()}
-                       className="w-full p-1.5 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 h-9"
-                     />
-                     <button
-                       onClick={handleConfirmGranularity}
-                       className="px-3 py-1.5 bg-blue-600 text-white text-xs sm:text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-colors whitespace-nowrap h-9"
-                     >
-                       确认
-                     </button>
-                   </div>
-                 </div>
-                  {/* Similarity Threshold Slider */}
-                  <div className="flex-1">
-                      <label htmlFor="similarityThreshold" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-1.5">
-                          颜色合并: <span className="font-semibold text-purple-600">{similarityThreshold}</span>
-                      </label>
-                      <input type="range" id="similarityThreshold" min="0" max="200" step="1" value={similarityThreshold} onChange={handleSimilarityChange} className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-600" />
-                      <div className="flex justify-between text-xs text-gray-500 mt-0.5 px-1"><span>少</span><span>多</span></div>
+              <div className="w-full max-w-xl grid grid-cols-1 sm:grid-cols-4 gap-4 bg-white p-3 sm:p-4 rounded-lg shadow">
+                {/* Granularity Input */}
+                <div className="flex-1">
+                  <label htmlFor="granularityInput" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-1.5">
+                    横轴格子 (10-1000):
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      id="granularityInput"
+                      value={granularityInput}
+                      onChange={handleGranularityInputChange}
+                      className="w-full p-1.5 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 h-9"
+                      min="10"
+                      max="100"
+                    />
+                    <button 
+                      onClick={handleConfirmGranularity}
+                      className="h-9 bg-blue-500 hover:bg-blue-600 text-white text-sm px-2 rounded-md whitespace-nowrap"
+                    >确认</button>
                   </div>
-                 {/* Palette Selector */}
-                 <div className="flex-1">
-                   <label htmlFor="paletteSelect" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-1.5">选择色板:</label>
-                   <select id="paletteSelect" value={selectedPaletteKeySet} onChange={handlePaletteChange} className="w-full p-1.5 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 h-9">
-                     {(Object.keys(paletteOptions) as PaletteOptionKey[]).map(key => (
-                       <option key={key} value={key}>{paletteOptions[key].name}</option>
-                     ))}
-                   </select>
-                 </div>
+                </div>
+
+                {/* Similarity Threshold Slider */}
+                <div className="flex-1">
+                    <label htmlFor="similarityThreshold" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-1.5">
+                        颜色合并: <span className="font-semibold text-purple-600">{similarityThreshold}</span>
+                    </label>
+                    <input
+                      type="range"
+                      id="similarityThreshold"
+                      min="0"
+                      max="100"
+                      value={similarityThreshold}
+                      onChange={handleSimilarityChange}
+                      className="w-full h-9"
+                    />
+                    <div className="flex justify-between text-xs text-gray-500 -mt-1">
+                      <span>少</span>
+                      <span>多</span>
+                    </div>
+                </div>
+
+                {/* Palette Selector */}
+                <div className="flex-1">
+                  <label htmlFor="paletteSelect" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-1.5">选择色板:</label>
+                  <select
+                    id="paletteSelect"
+                    value={selectedPaletteKeySet}
+                    onChange={handlePaletteChange}
+                    className="w-full p-1.5 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 h-9"
+                  >
+                    {(Object.keys(paletteOptions) as PaletteOptionKey[]).map(key => (
+                      <option key={key} value={key}>{paletteOptions[key].name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 添加像素化模式选择 */}
+                <div className="flex-1">
+                  <label htmlFor="pixelationModeSelect" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-1.5">处理模式:</label>
+                  <select
+                    id="pixelationModeSelect"
+                    value={pixelationMode}
+                    onChange={handlePixelationModeChange}
+                    className="w-full p-1.5 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 h-9"
+                  >
+                    <option value={PixelationMode.Dominant}>卡通 (主色)</option>
+                    <option value={PixelationMode.Average}>真实 (平均)</option>
+                  </select>
+                </div>
               </div>
             )} {/* ++ End of HIDE Control Row ++ */}
 
