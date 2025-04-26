@@ -997,11 +997,11 @@ export default function Home() {
       }}
     />
 
-    <div className="min-h-screen p-4 sm:p-6 flex flex-col items-center bg-gradient-to-b from-gray-50 to-white font-[family-name:var(--font-geist-sans)]">
-      <header className="w-full max-w-4xl text-center mt-6 mb-8 sm:mt-8 sm:mb-10 relative">
-        {/* 装饰背景圆形 */}
-        <div className="absolute -top-10 -left-24 w-48 h-48 bg-blue-100 rounded-full opacity-30 blur-3xl"></div>
-        <div className="absolute -bottom-10 -right-24 w-48 h-48 bg-pink-100 rounded-full opacity-30 blur-3xl"></div>
+    <div className="min-h-screen p-4 sm:p-6 flex flex-col items-center bg-gradient-to-b from-gray-50 to-white font-[family-name:var(--font-geist-sans)] overflow-x-hidden">
+      <header className="w-full md:max-w-4xl text-center mt-6 mb-8 sm:mt-8 sm:mb-10 relative overflow-hidden">
+        {/* 装饰背景圆形 - 修改位置确保不超出屏幕 */}
+        <div className="absolute top-0 left-0 w-48 h-48 bg-blue-100 rounded-full opacity-30 blur-3xl"></div>
+        <div className="absolute bottom-0 right-0 w-48 h-48 bg-pink-100 rounded-full opacity-30 blur-3xl"></div>
         
         {/* 装饰点阵图案 - 表示拼豆效果 */}
         <div className="absolute top-0 right-0 grid grid-cols-5 gap-1 opacity-20">
@@ -1043,12 +1043,12 @@ export default function Home() {
         </div>
       </header>
 
-      <main ref={mainRef} className="w-full max-w-4xl flex flex-col items-center space-y-5 sm:space-y-6 relative"> {/* 添加 relative 定位 */}
+      <main ref={mainRef} className="w-full md:max-w-4xl flex flex-col items-center space-y-5 sm:space-y-6 relative overflow-hidden"> {/* 添加 overflow-hidden */}
         {/* Drop Zone */}
         <div
           onDrop={handleDrop} onDragOver={handleDragOver} onDragEnter={handleDragOver}
           onClick={() => fileInputRef.current?.click()}
-          className="border-2 border-dashed border-gray-300 rounded-lg p-6 sm:p-8 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all duration-300 w-full max-w-md flex flex-col justify-center items-center shadow-sm hover:shadow-md"
+          className="border-2 border-dashed border-gray-300 rounded-lg p-6 sm:p-8 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all duration-300 w-full md:max-w-md flex flex-col justify-center items-center shadow-sm hover:shadow-md"
           style={{ minHeight: '130px' }}
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 sm:h-12 sm:w-12 text-gray-400 mb-2 sm:mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
@@ -1065,7 +1065,7 @@ export default function Home() {
           <div className="w-full flex flex-col items-center space-y-5 sm:space-y-6">
             {/* ++ HIDE Control Row in manual mode ++ */}
             {!isManualColoringMode && (
-              <div className="w-full max-w-2xl grid grid-cols-1 sm:grid-cols-4 gap-4 bg-white p-4 sm:p-5 rounded-xl shadow-md border border-gray-100">
+              <div className="w-full md:max-w-2xl grid grid-cols-1 sm:grid-cols-4 gap-4 bg-white p-4 sm:p-5 rounded-xl shadow-md border border-gray-100">
                 {/* Granularity Input */}
                 <div className="flex-1">
                   <label htmlFor="granularityInput" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
@@ -1140,7 +1140,7 @@ export default function Home() {
             )} {/* ++ End of HIDE Control Row ++ */}
 
             {/* Output Section */}
-            <div className="w-full max-w-2xl">
+            <div className="w-full md:max-w-2xl">
               <canvas ref={originalCanvasRef} className="hidden"></canvas>
 
               {/* ++ RENDER Button/Palette ONLY in manual mode above canvas ++ */}
@@ -1190,7 +1190,7 @@ export default function Home() {
 
         {/* ++ HIDE Color Counts in manual mode ++ */}
         {!isManualColoringMode && originalImageSrc && colorCounts && Object.keys(colorCounts).length > 0 && (
-          <div className="w-full max-w-2xl mt-6 bg-white p-4 rounded-lg shadow">
+          <div className="w-full md:max-w-2xl mt-6 bg-white p-4 rounded-lg shadow">
             <h3 className="text-lg font-semibold mb-1 text-gray-700 text-center">
               颜色统计 & 去除杂色 ({paletteOptions[selectedPaletteKeySet]?.name || '未知色板'})
             </h3>
@@ -1243,7 +1243,7 @@ export default function Home() {
 
         {/* Message if palette becomes empty (Also hide in manual mode) */}
          {!isManualColoringMode && originalImageSrc && activeBeadPalette.length === 0 && excludedColorKeys.size > 0 && (
-             <div className="w-full max-w-2xl mt-6 bg-yellow-100 p-4 rounded-lg shadow text-center text-sm text-yellow-800">
+             <div className="w-full md:max-w-2xl mt-6 bg-yellow-100 p-4 rounded-lg shadow text-center text-sm text-yellow-800">
                  当前可用颜色过少或为空。请在上方统计列表中点击恢复部分颜色，或更换色板。
                  {excludedColorKeys.size > 0 && (
                       <button
@@ -1262,7 +1262,7 @@ export default function Home() {
 
         {/* ++ RENDER Enter Manual Mode Button ONLY when NOT in manual mode (before downloads) ++ */}
         {!isManualColoringMode && originalImageSrc && mappedPixelData && gridDimensions && (
-            <div className="w-full max-w-2xl mt-4"> {/* Wrapper div */} 
+            <div className="w-full md:max-w-2xl mt-4"> {/* Wrapper div */} 
              <button
                 onClick={() => {
                   setIsManualColoringMode(true); // Enter mode
@@ -1279,7 +1279,7 @@ export default function Home() {
 
         {/* ++ HIDE Download Buttons in manual mode ++ */}
         {!isManualColoringMode && originalImageSrc && mappedPixelData && (
-            <div className="w-full max-w-2xl mt-4 flex flex-col sm:flex-row gap-2 sm:gap-3">
+            <div className="w-full md:max-w-2xl mt-4 flex flex-col sm:flex-row gap-2 sm:gap-3">
               {/* Download Grid Button */}
               <button
                 onClick={handleDownloadImage}
@@ -1310,7 +1310,7 @@ export default function Home() {
 
       </main>
 
-      <footer className="w-full max-w-4xl mt-10 mb-6 py-6 text-center text-xs sm:text-sm text-gray-500 border-t border-gray-200 bg-gradient-to-b from-white to-gray-50 rounded-lg shadow-inner">
+      <footer className="w-full md:max-w-4xl mt-10 mb-6 py-6 text-center text-xs sm:text-sm text-gray-500 border-t border-gray-200 bg-gradient-to-b from-white to-gray-50 rounded-lg shadow-inner">
         {/* ++ 修改：访问统计分行显示 ++ */}
         
         {/* 新增打赏按钮 - 移到版权信息前面，样式优化 */}
@@ -1348,7 +1348,7 @@ export default function Home() {
       {/* 打赏弹窗 - 优化设计 */}
       {isDonationModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 transition-all duration-300">
-          <div className="bg-white rounded-2xl shadow-2xl w-[calc(100vw-2rem)] sm:w-full sm:max-w-md max-h-[90vh] overflow-y-auto transform transition-all">
+          <div className="bg-white rounded-2xl shadow-2xl w-[calc(100vw-2rem)] sm:w-full md:max-w-md max-h-[90vh] overflow-y-auto transform transition-all">
             <div className="p-3 sm:p-6">
               <div className="flex justify-between items-center mb-3 sm:mb-5">
                 <h3 className="text-lg sm:text-xl font-bold text-gray-800 bg-gradient-to-r from-pink-500 to-rose-500 bg-clip-text text-transparent">给我点杯奶茶</h3>
