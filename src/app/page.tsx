@@ -1139,7 +1139,7 @@ export default function Home() {
                       onChange={handleGranularityInputChange}
                       className="w-full p-1.5 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 h-9"
                       min="10"
-                      max="100"
+                      max="1000"
                     />
                     <button 
                       onClick={handleConfirmGranularity}
