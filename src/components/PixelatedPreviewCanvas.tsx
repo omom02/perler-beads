@@ -7,7 +7,6 @@ interface PixelatedPreviewCanvasProps {
   mappedPixelData: MappedPixel[][] | null;
   gridDimensions: { N: number; M: number } | null;
   isManualColoringMode: boolean;
-  selectedColor: MappedPixel | null;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   onInteraction: (
     clientX: number,
@@ -74,7 +73,6 @@ const PixelatedPreviewCanvas: React.FC<PixelatedPreviewCanvasProps> = ({
   mappedPixelData,
   gridDimensions,
   isManualColoringMode,
-  selectedColor,
   canvasRef,
   onInteraction,
 }) => {

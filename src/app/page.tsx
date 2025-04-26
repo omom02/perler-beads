@@ -833,84 +833,6 @@ export default function Home() {
     }
   };
 
-  // ++ Updated: Mouse move handler ++
-  const handleCanvasMouseMove = (event: React.MouseEvent<HTMLCanvasElement>) => {
-    // Prevent mouse events from interfering during touch interactions
-    if (touchStartPosRef.current) return;
-     clearLongPress(); // Clear any potential lingering timer
-    updateTooltip(event.clientX, event.clientY, event.pageX, event.pageY);
-  };
-
-  // ++ Updated: Mouse leave handler ++
-  const handleCanvasMouseLeave = () => {
-     // Prevent mouse events from interfering during touch interactions
-     if (touchStartPosRef.current) return;
-    clearLongPress();
-    setTooltipData(null);
-  };
-
-  // ++ Add a dedicated click handler for coloring ++
-  const handleCanvasClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
-    if (isManualColoringMode && selectedColor) {
-        // Use the existing interaction logic, passing isClick as true
-        handleCanvasInteraction(event.clientX, event.clientY, event.pageX, event.pageY, true);
-    }
-  };
-
-  // ++ Touch start handler - Ensure touch variable is used correctly ++ 
-  const handleTouchStart = (event: TouchEvent<HTMLCanvasElement>) => {
-    const touch = event.touches[0];
-    if (!touch) return;
-
-    // Store touch start position for move detection (tooltip logic)
-    touchStartPosRef.current = { x: touch.clientX, y: touch.clientY, pageX: touch.pageX, pageY: touch.pageY };
-    touchMovedRef.current = false; // Reset move flag
-
-    if (isManualColoringMode && selectedColor) {
-      // Handle coloring on touch start (like a tap)
-      handleCanvasInteraction(touch.clientX, touch.clientY, touch.pageX, touch.pageY, true);
-    } else {
-       // Original Tooltip Long Press Logic
-       clearLongPress(); // Clear any previous timer
-       longPressTimerRef.current = setTimeout(() => {
-          // Only show tooltip if finger hasn't moved significantly
-         if (!touchMovedRef.current && touchStartPosRef.current) {
-             // Use coordinates from touchStartPosRef.current here
-             handleCanvasInteraction(touchStartPosRef.current.x, touchStartPosRef.current.y, touchStartPosRef.current.pageX, touchStartPosRef.current.pageY);
-         }
-       }, 500); // 500ms for long press
-    }
-  };
-
-  // ++ Touch move handler - Ensure touch variable and refs are used correctly ++ 
-  const handleTouchMove = (event: TouchEvent<HTMLCanvasElement>) => {
-    const touch = event.touches[0];
-    if (!touch || !touchStartPosRef.current) return;
-
-    // Check if touch has moved significantly from the start position
-    const dx = Math.abs(touch.clientX - touchStartPosRef.current.x);
-    const dy = Math.abs(touch.clientY - touchStartPosRef.current.y);
-    if (dx > 5 || dy > 5) { // Threshold to detect movement
-        touchMovedRef.current = true;
-        clearLongPress(); // Cancel long press if finger moves
-        setTooltipData(null); // Hide tooltip during move
-    }
-  };
-
-  // ++ Touch end handler - Ensure refs are used correctly ++ 
-  const handleTouchEnd = () => {
-    clearLongPress();
-    // Delay hiding tooltip slightly on touch end to avoid flicker if long press just triggered
-    // and finger didn't move (touchMovedRef is false)
-    if (!touchMovedRef.current) {
-        setTimeout(() => setTooltipData(null), 100);
-    } else {
-        setTooltipData(null); // Hide immediately if finger moved
-    }
-    touchStartPosRef.current = null; // Clear start position
-    touchMovedRef.current = false; // Reset move flag
-  };
-
   // --- Canvas Interaction ---
 
   // ++ Re-introduce the combined interaction handler ++
@@ -1304,7 +1226,6 @@ export default function Home() {
                     mappedPixelData={mappedPixelData}
                     gridDimensions={gridDimensions}
                     isManualColoringMode={isManualColoringMode}
-                    selectedColor={selectedColor}
                     onInteraction={handleCanvasInteraction}
                   />
                 </div>
