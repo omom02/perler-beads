@@ -479,26 +479,57 @@ export default function Home() {
       // ... 保持洪水填充算法不变，但在mergedData上操作 ...
       const visitedForFloodFill: boolean[][] = Array(M).fill(null).map(() => Array(N).fill(false));
 
-      const floodFill = (r: number, c: number) => {
-          const cell = mergedData[r]?.[c];
-          if (r < 0 || r >= M || c < 0 || c >= N || visitedForFloodFill[r][c] || !cell || !BACKGROUND_COLOR_KEYS.includes(cell.key)) {
+      // 将递归的floodFill改为迭代实现，使用队列避免栈溢出
+      const iterativeFloodFill = (startR: number, startC: number) => {
+          // 先检查起始点是否有效
+          if (startR < 0 || startR >= M || startC < 0 || startC >= N || 
+              visitedForFloodFill[startR][startC]) {
               return;
           }
-          visitedForFloodFill[r][c] = true;
-          cell.isExternal = true;
-          floodFill(r + 1, c);
-          floodFill(r - 1, c);
-          floodFill(r, c + 1);
-          floodFill(r, c - 1);
+          
+          const startCell = mergedData[startR]?.[startC];
+          if (!startCell || !BACKGROUND_COLOR_KEYS.includes(startCell.key)) {
+              return;
+          }
+
+          const queue: { r: number; c: number }[] = [{ r: startR, c: startC }];
+          visitedForFloodFill[startR][startC] = true;
+          startCell.isExternal = true;
+
+          while (queue.length > 0) {
+              const { r, c } = queue.shift()!;
+              
+              // 检查四个方向的邻居
+              const neighbors = [
+                  { nr: r + 1, nc: c },
+                  { nr: r - 1, nc: c },
+                  { nr: r, nc: c + 1 },
+                  { nr: r, nc: c - 1 }
+              ];
+
+              for (const { nr, nc } of neighbors) {
+                  // 检查边界和访问状态
+                  if (nr >= 0 && nr < M && nc >= 0 && nc < N && !visitedForFloodFill[nr][nc]) {
+                      const neighborCell = mergedData[nr]?.[nc];
+                      // 检查是否是背景色
+                      if (neighborCell && BACKGROUND_COLOR_KEYS.includes(neighborCell.key)) {
+                          visitedForFloodFill[nr][nc] = true;
+                          neighborCell.isExternal = true;
+                          queue.push({ r: nr, c: nc });
+                      }
+                  }
+              }
+          }
       };
 
+      // 保留原始的循环，但改用迭代版本的flood fill
       for (let i = 0; i < N; i++) {
-          if (!visitedForFloodFill[0][i] && mergedData[0]?.[i] && BACKGROUND_COLOR_KEYS.includes(mergedData[0][i].key)) floodFill(0, i);
-          if (!visitedForFloodFill[M - 1][i] && mergedData[M - 1]?.[i] && BACKGROUND_COLOR_KEYS.includes(mergedData[M - 1][i].key)) floodFill(M - 1, i);
+          if (!visitedForFloodFill[0][i] && mergedData[0]?.[i] && BACKGROUND_COLOR_KEYS.includes(mergedData[0][i].key)) iterativeFloodFill(0, i);
+          if (!visitedForFloodFill[M - 1][i] && mergedData[M - 1]?.[i] && BACKGROUND_COLOR_KEYS.includes(mergedData[M - 1][i].key)) iterativeFloodFill(M - 1, i);
       }
       for (let j = 0; j < M; j++) {
-          if (!visitedForFloodFill[j][0] && mergedData[j]?.[0] && BACKGROUND_COLOR_KEYS.includes(mergedData[j][0].key)) floodFill(j, 0);
-          if (!visitedForFloodFill[j][N - 1] && mergedData[j]?.[N - 1] && BACKGROUND_COLOR_KEYS.includes(mergedData[j][N - 1].key)) floodFill(j, N - 1);
+          if (!visitedForFloodFill[j][0] && mergedData[j]?.[0] && BACKGROUND_COLOR_KEYS.includes(mergedData[j][0].key)) iterativeFloodFill(j, 0);
+          if (!visitedForFloodFill[j][N - 1] && mergedData[j]?.[N - 1] && BACKGROUND_COLOR_KEYS.includes(mergedData[j][N - 1].key)) iterativeFloodFill(j, N - 1);
       }
       console.log("Background flood fill marking complete.");
 
