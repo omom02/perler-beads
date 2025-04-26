@@ -1134,10 +1134,10 @@ export default function Home() {
           <div className="w-full flex flex-col items-center space-y-5 sm:space-y-6">
             {/* ++ HIDE Control Row in manual mode ++ */}
             {!isManualColoringMode && (
-              <div className="w-full max-w-2xl grid grid-cols-1 sm:grid-cols-4 gap-4 bg-white p-3 sm:p-4 rounded-lg shadow">
+              <div className="w-full max-w-2xl grid grid-cols-1 sm:grid-cols-4 gap-4 bg-white p-4 sm:p-5 rounded-xl shadow-md border border-gray-100">
                 {/* Granularity Input */}
                 <div className="flex-1">
-                  <label htmlFor="granularityInput" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-1.5">
+                  <label htmlFor="granularityInput" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     横轴格子 (10-300):
                   </label>
                   <div className="flex items-center gap-2">
@@ -1146,20 +1146,20 @@ export default function Home() {
                       id="granularityInput"
                       value={granularityInput}
                       onChange={handleGranularityInputChange}
-                      className="w-full p-1.5 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 h-9"
+                      className="w-full p-1.5 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 h-9 shadow-sm"
                       min="10"
                       max="300"
                     />
                     <button 
                       onClick={handleConfirmGranularity}
-                      className="h-9 bg-blue-500 hover:bg-blue-600 text-white text-sm px-2 rounded-md whitespace-nowrap"
+                      className="h-9 bg-blue-500 hover:bg-blue-600 text-white text-sm px-2.5 rounded-md whitespace-nowrap transition-colors duration-200 shadow-sm"
                     >确认</button>
                   </div>
                 </div>
 
                 {/* Similarity Threshold Slider */}
                 <div className="flex-1">
-                    <label htmlFor="similarityThreshold" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-1.5">
+                    <label htmlFor="similarityThreshold" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                         区域颜色合并: <span className="font-semibold text-purple-600">{similarityThreshold}</span>
                     </label>
                     <input
@@ -1169,7 +1169,7 @@ export default function Home() {
                       max="100"
                       value={similarityThreshold}
                       onChange={handleSimilarityChange}
-                      className="w-full h-9"
+                      className="w-full h-9 accent-purple-600"
                     />
                     <div className="flex justify-between text-xs text-gray-500 -mt-1">
                       <span>少</span>
@@ -1179,12 +1179,12 @@ export default function Home() {
 
                 {/* Palette Selector */}
                 <div className="flex-1">
-                  <label htmlFor="paletteSelect" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-1.5">选择色板:</label>
+                  <label htmlFor="paletteSelect" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">选择色板:</label>
                   <select
                     id="paletteSelect"
                     value={selectedPaletteKeySet}
                     onChange={handlePaletteChange}
-                    className="w-full p-1.5 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 h-9"
+                    className="w-full p-1.5 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 h-9 shadow-sm"
                   >
                     {(Object.keys(paletteOptions) as PaletteOptionKey[]).map(key => (
                       <option key={key} value={key}>{paletteOptions[key].name}</option>
@@ -1194,12 +1194,12 @@ export default function Home() {
 
                 {/* 添加像素化模式选择 */}
                 <div className="flex-1">
-                  <label htmlFor="pixelationModeSelect" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-1.5">处理模式:</label>
+                  <label htmlFor="pixelationModeSelect" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">处理模式:</label>
                   <select
                     id="pixelationModeSelect"
                     value={pixelationMode}
                     onChange={handlePixelationModeChange}
-                    className="w-full p-1.5 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 h-9"
+                    className="w-full p-1.5 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 h-9 shadow-sm"
                   >
                     <option value={PixelationMode.Dominant}>卡通 (主色)</option>
                     <option value={PixelationMode.Average}>真实 (平均)</option>
@@ -1214,7 +1214,7 @@ export default function Home() {
 
               {/* ++ RENDER Button/Palette ONLY in manual mode above canvas ++ */}
               {isManualColoringMode && mappedPixelData && gridDimensions && (
-                <div className="w-full mb-4 p-3 bg-blue-50 rounded-lg shadow-sm">
+                <div className="w-full mb-4 p-4 bg-blue-50 rounded-xl shadow-md border border-blue-100">
                   {/* Finish Manual Coloring Button */}
                   <button
                     onClick={() => {
@@ -1222,13 +1222,13 @@ export default function Home() {
                       setSelectedColor(null);
                       setTooltipData(null);
                     }}
-                    className={`w-full py-2 px-4 text-sm sm:text-base rounded-md transition-colors flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 text-white`}
+                    className={`w-full py-2.5 px-4 text-sm sm:text-base rounded-lg transition-all duration-200 flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 text-white shadow-sm hover:shadow-md`}
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}> <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /> </svg>
                     完成手动上色
                   </button>
                   {/* Color Palette (only in manual mode) */}
-                  <div className="mt-3">
+                  <div className="mt-4">
                     <p className="text-xs text-center text-gray-600 mb-2">选择颜色或橡皮擦后，点击下方画布格子进行填充或擦除:</p>
                     <ColorPalette
                       colors={[transparentColorData, ...currentGridColors]}
@@ -1241,8 +1241,8 @@ export default function Home() {
               )} {/* ++ End of RENDER Button/Palette ++ */}
 
               {/* Canvas Preview Container */}
-              <div className="bg-white p-3 sm:p-4 rounded-lg shadow">
-                <div className="flex justify-center mb-3 sm:mb-4 bg-gray-100 p-2 rounded overflow-hidden"
+              <div className="bg-white p-4 rounded-xl shadow-md border border-gray-100">
+                <div className="flex justify-center mb-3 sm:mb-4 bg-gray-100 p-2 rounded-lg overflow-hidden"
                      style={{ minHeight: '150px' }}>
                   <PixelatedPreviewCanvas
                     canvasRef={pixelatedCanvasRef}
@@ -1339,7 +1339,7 @@ export default function Home() {
                   setSelectedColor(null);
                   setTooltipData(null);
                 }}
-                className={`w-full py-2 px-4 text-sm sm:text-base rounded-md transition-colors flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 text-white`}
+                className={`w-full py-2.5 px-4 text-sm sm:text-base rounded-lg transition-all duration-300 flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-md hover:shadow-lg hover:translate-y-[-1px]`}
               >
                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"> <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" /> </svg>
                  进入手动上色模式
@@ -1354,7 +1354,7 @@ export default function Home() {
               <button
                 onClick={handleDownloadImage}
                 disabled={!mappedPixelData || !gridDimensions || gridDimensions.N === 0 || gridDimensions.M === 0 || activeBeadPalette.length === 0}
-                className="flex-1 py-2 px-4 bg-green-600 text-white text-sm sm:text-base rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 py-2.5 px-4 bg-gradient-to-r from-green-500 to-green-600 text-white text-sm sm:text-base rounded-lg hover:from-green-600 hover:to-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg hover:translate-y-[-1px] disabled:hover:translate-y-0 disabled:hover:shadow-md"
                >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                 下载图纸 (带色号)
@@ -1363,7 +1363,7 @@ export default function Home() {
               <button
                 onClick={handleDownloadStatsImage}
                 disabled={!colorCounts || totalBeadCount === 0 || activeBeadPalette.length === 0}
-                className="flex-1 py-2 px-4 bg-purple-600 text-white text-sm sm:text-base rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 py-2.5 px-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white text-sm sm:text-base rounded-lg hover:from-purple-600 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg hover:translate-y-[-1px] disabled:hover:translate-y-0 disabled:hover:shadow-md"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                 下载数量表 (PNG)
@@ -1427,10 +1427,10 @@ export default function Home() {
               
               <div className="text-center">
                 <p className="mb-4 text-gray-600">
-                  开源项目就是纯粹的为爱发电项目，作者会在工作之余尽力维护，如果您希望这个项目更好，可以让我看到
+                  开源项目就是纯粹的为爱发电项目，作者会在工作之余尽力维护，如果您希望这个项目更好，可以给我点杯奶茶。
                 </p>
                 <p className="mb-6 text-gray-600">
-                  每一份都支持是这个项目继续维护的动力。
+                  你的支持是这个项目继续维护的动力。
                 </p>
                 
                 <div className="flex justify-center mb-5">
