@@ -1321,7 +1321,7 @@ export default function Home() {
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M9.333 5.833c.736-.277 1.522-.422 2.318-.422.796 0 1.582.145 2.318.422M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          给我点杯奶茶
+          请我喝一杯奶茶
         </button>
         
         <p className="font-medium text-gray-600">
@@ -1351,7 +1351,7 @@ export default function Home() {
           <div className="bg-white rounded-2xl shadow-2xl w-[calc(100vw-2rem)] sm:w-full md:max-w-md max-h-[90vh] overflow-y-auto transform transition-all">
             <div className="p-3 sm:p-6">
               <div className="flex justify-between items-center mb-3 sm:mb-5">
-                <h3 className="text-lg sm:text-xl font-bold text-gray-800 bg-gradient-to-r from-pink-500 to-rose-500 bg-clip-text text-transparent">给我点杯奶茶</h3>
+                <h3 className="text-lg sm:text-xl font-bold text-gray-800 bg-gradient-to-r from-pink-500 to-rose-500 bg-clip-text text-transparent">BuyMeAMilkTea</h3>
                 <button 
                   onClick={() => setIsDonationModalOpen(false)}
                   className="text-gray-500 hover:text-gray-700 transition-colors duration-200"
@@ -1364,17 +1364,17 @@ export default function Home() {
               
               <div className="text-center">
                 <p className="mb-3 text-sm sm:text-base text-gray-600 break-words">
-                开源项目是作者和每一个用户共同构建的，如果你希望这个项目变得更好，可以让我看到。
+                  项目开源不易，离不开您的支持，如果你希望这个项目变得更好，可以请我喝一杯奶茶。
                 </p>
                 <p className="mb-4 sm:mb-6 text-sm sm:text-base text-gray-600 break-words">
-                  你的支持是这个项目继续维护的动力。
+                  您的支持是这个项目继续下去的唯一动力。
                 </p>
                 
                 <div className="flex justify-center mb-4 sm:mb-5">
                   <div className="relative w-40 h-40 sm:w-48 sm:h-48 md:w-56 md:h-56 p-1 sm:p-2 bg-gradient-to-r from-pink-100 to-rose-100 rounded-lg shadow-md">
                     <Image 
                       src="/donation-qr.jpg" 
-                      alt="打赏二维码" 
+                      alt="赞赏码" 
                       fill
                       className="object-contain p-1 sm:p-2"
                     />
@@ -1382,7 +1382,7 @@ export default function Home() {
                 </div>
                 
                 <p className="text-xs sm:text-sm text-gray-500 bg-gray-50 py-1.5 px-3 sm:py-2 sm:px-4 rounded-full inline-block shadow-sm">
-                  扫描上方二维码，给我点杯奶茶。
+                  微信扫描上方赞赏码，请我喝一杯奶茶。
                 </p>
               </div>
             </div>
