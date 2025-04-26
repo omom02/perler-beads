@@ -1318,10 +1318,15 @@ export default function Home() {
           onClick={() => setIsDonationModalOpen(true)}
           className="mb-5 px-6 py-2.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-full shadow-lg transition-all duration-300 hover:shadow-xl hover:translate-y-[-2px] flex items-center justify-center mx-auto"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M9.333 5.833c.736-.277 1.522-.422 2.318-.422.796 0 1.582.145 2.318.422M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M18 8h1a2 2 0 0 1 2 2v1c0 1.1-.9 2-2 2h-1" fill="#f9a8d4" />
+            <path d="M6 8h12v9a3 3 0 0 1-3 3H9a3 3 0 0 1-3-3V8z" fill="#f9a8d4" />
+            <path d="M6 8V7a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v1" fill="#f472b6" />
+            <path d="M12 16v-4" stroke="#7d2a5a" />
+            <path d="M9.5 14.5L9 16" stroke="#7d2a5a" />
+            <path d="M14.5 14.5L15 16" stroke="#7d2a5a" />
           </svg>
-          请我喝一杯奶茶
+          <span className="font-serif italic" style={{ fontFamily: "'Brush Script MT', cursive, serif" }}>Buy Me A Milk Tea</span>
         </button>
         
         <p className="font-medium text-gray-600">
@@ -1351,7 +1356,17 @@ export default function Home() {
           <div className="bg-white rounded-2xl shadow-2xl w-[calc(100vw-2rem)] sm:w-full md:max-w-md max-h-[90vh] overflow-y-auto transform transition-all">
             <div className="p-3 sm:p-6">
               <div className="flex justify-between items-center mb-3 sm:mb-5">
-                <h3 className="text-lg sm:text-xl font-bold text-gray-800 bg-gradient-to-r from-pink-500 to-rose-500 bg-clip-text text-transparent font-serif italic" style={{ fontFamily: "'Brush Script MT', cursive, serif" }}>Buy Me A Milk Tea</h3>
+                <h3 className="text-lg sm:text-xl font-bold text-gray-800 bg-gradient-to-r from-pink-500 to-rose-500 bg-clip-text text-transparent font-serif italic flex items-center" style={{ fontFamily: "'Brush Script MT', cursive, serif" }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18 8h1a2 2 0 0 1 2 2v1c0 1.1-.9 2-2 2h-1" fill="#f9a8d4" />
+                    <path d="M6 8h12v9a3 3 0 0 1-3 3H9a3 3 0 0 1-3-3V8z" fill="#f9a8d4" />
+                    <path d="M6 8V7a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v1" fill="#f472b6" />
+                    <path d="M12 16v-4" stroke="#7d2a5a" />
+                    <path d="M9.5 14.5L9 16" stroke="#7d2a5a" />
+                    <path d="M14.5 14.5L15 16" stroke="#7d2a5a" />
+                  </svg>
+                  Buy Me A Milk Tea
+                </h3>
                 <button 
                   onClick={() => setIsDonationModalOpen(false)}
                   className="text-gray-500 hover:text-gray-700 transition-colors duration-200"
@@ -1364,7 +1379,7 @@ export default function Home() {
               
               <div className="text-center">
                 <p className="mb-3 text-sm sm:text-base text-gray-600 break-words">
-                  算法开源不易，离不开您的支持，如果您希望这个项目变得更好，可以请我喝一杯奶茶。
+                  算法开源不易，离不开您的支持，如果您希望这个项目继续发展，可以请我喝一杯奶茶。
                 </p>
                 <p className="mb-4 sm:mb-6 text-sm sm:text-base text-gray-600 break-words">
                   您的支持是这个项目继续下去的唯一动力。
