@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useEffect, TouchEvent, MouseEvent } from 'react';
+import React, { useRef, useEffect, TouchEvent, MouseEvent, useState } from 'react';
 import { MappedPixel } from '../utils/pixelation';
 
 interface PixelatedPreviewCanvasProps {
@@ -37,6 +37,13 @@ const drawPixelatedCanvas = (
     return;
   }
 
+  // Check if dark mode is active on the HTML element
+  const isDarkMode = typeof window !== 'undefined' && document.documentElement.classList.contains('dark');
+
+  // Define colors based on mode
+  const externalBackgroundColor = isDarkMode ? '#374151' : '#F3F4F6'; // gray-700 : gray-100
+  const gridLineColor = isDarkMode ? '#4B5563' : '#DDDDDD'; // gray-600 : lighter gray
+
   const { N, M } = dims;
   const outputWidth = canvas.width;
   const outputHeight = canvas.height;
@@ -44,7 +51,7 @@ const drawPixelatedCanvas = (
   const cellHeightOutput = outputHeight / M;
 
   pixelatedCtx.clearRect(0, 0, outputWidth, outputHeight);
-  pixelatedCtx.lineWidth = 0.5; // 减小网格线宽度以获得更清晰的视觉效果
+  pixelatedCtx.lineWidth = 0.5; // Keep line width thin
 
   for (let j = 0; j < M; j++) {
     for (let i = 0; i < N; i++) {
@@ -54,16 +61,16 @@ const drawPixelatedCanvas = (
       const drawX = i * cellWidthOutput;
       const drawY = j * cellHeightOutput;
 
-      // 填充单元格颜色
+      // Fill cell color using mode-specific background for external cells
       if (cellData.isExternal) {
-        pixelatedCtx.fillStyle = '#F3F4F6'; // 外部区域使用浅灰色
+        pixelatedCtx.fillStyle = externalBackgroundColor;
       } else {
         pixelatedCtx.fillStyle = cellData.color;
       }
       pixelatedCtx.fillRect(drawX, drawY, cellWidthOutput, cellHeightOutput);
 
-      // 绘制网格线
-      pixelatedCtx.strokeStyle = '#DDDDDD';
+      // Draw grid lines using mode-specific color
+      pixelatedCtx.strokeStyle = gridLineColor;
       pixelatedCtx.strokeRect(drawX + 0.5, drawY + 0.5, cellWidthOutput, cellHeightOutput);
     }
   }
@@ -76,12 +83,41 @@ const PixelatedPreviewCanvas: React.FC<PixelatedPreviewCanvasProps> = ({
   canvasRef,
   onInteraction,
 }) => {
-  // 当数据变化时重绘画布
+  // Add a state to trigger redraw when dark mode changes
+  const [darkModeState, setDarkModeState] = useState<boolean | null>(null);
+
+  // Effect to detect dark mode changes and update state
   useEffect(() => {
-    if (mappedPixelData && gridDimensions && canvasRef.current) {
+    if (typeof window === 'undefined') return;
+
+    const checkDarkMode = () => {
+        const isDark = document.documentElement.classList.contains('dark');
+        // Only update state if it actually changes
+        if (isDark !== darkModeState) {
+            setDarkModeState(isDark);
+        }
+    };
+
+    // Initial check
+    checkDarkMode();
+
+    // Use MutationObserver to watch for class changes on <html>
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+
+    // Cleanup observer on component unmount
+    return () => observer.disconnect();
+
+  }, [darkModeState]); // Depend on darkModeState to re-run if needed externally
+
+  // Update useEffect for drawing to depend on darkModeState as well
+  useEffect(() => {
+    // Ensure darkModeState is not null before drawing
+    if (mappedPixelData && gridDimensions && canvasRef.current && darkModeState !== null) {
+      console.log(`Redrawing canvas, dark mode: ${darkModeState}`); // Log redraw trigger
       drawPixelatedCanvas(mappedPixelData, canvasRef.current, gridDimensions);
     }
-  }, [mappedPixelData, gridDimensions, canvasRef]);
+  }, [mappedPixelData, gridDimensions, canvasRef, darkModeState]); // Add darkModeState dependency
 
   // --- 鼠标事件处理 ---
   
@@ -170,7 +206,7 @@ const PixelatedPreviewCanvas: React.FC<PixelatedPreviewCanvasProps> = ({
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchEnd}
-      className={`border border-gray-300 max-w-full h-auto rounded block ${
+      className={`border border-gray-300 dark:border-gray-600 max-w-full h-auto rounded block ${
         isManualColoringMode ? 'cursor-pointer' : 'cursor-crosshair'
       }`}
       style={{ 

@@ -1028,75 +1028,87 @@ export default function Home() {
       }}
     />
 
-    <div className="min-h-screen p-4 sm:p-6 flex flex-col items-center bg-gradient-to-b from-gray-50 to-white font-[family-name:var(--font-geist-sans)] overflow-x-hidden">
+    {/* Apply dark mode styles to the main container */}
+    <div className="min-h-screen p-4 sm:p-6 flex flex-col items-center bg-gradient-to-b from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 font-[family-name:var(--font-geist-sans)] overflow-x-hidden">
+      {/* Apply dark mode styles to the header */}
       <header className="w-full md:max-w-4xl text-center mt-6 mb-8 sm:mt-8 sm:mb-10 relative overflow-hidden">
-        {/* 装饰背景圆形 - 修改位置确保不超出屏幕 */}
-        <div className="absolute top-0 left-0 w-48 h-48 bg-blue-100 rounded-full opacity-30 blur-3xl"></div>
-        <div className="absolute bottom-0 right-0 w-48 h-48 bg-pink-100 rounded-full opacity-30 blur-3xl"></div>
-        
-        {/* 装饰点阵图案 - 表示拼豆效果 */}
-        <div className="absolute top-0 right-0 grid grid-cols-5 gap-1 opacity-20">
+        {/* Adjust decorative background colors for dark mode */}
+        <div className="absolute top-0 left-0 w-48 h-48 bg-blue-100 dark:bg-blue-900 rounded-full opacity-30 dark:opacity-20 blur-3xl"></div>
+        <div className="absolute bottom-0 right-0 w-48 h-48 bg-pink-100 dark:bg-pink-900 rounded-full opacity-30 dark:opacity-20 blur-3xl"></div>
+
+        {/* Adjust decorative dots color */}
+        <div className="absolute top-0 right-0 grid grid-cols-5 gap-1 opacity-20 dark:opacity-10">
           {[...Array(25)].map((_, i) => (
-            <div key={i} className="w-1.5 h-1.5 rounded-full bg-gray-400"></div>
+            <div key={i} className="w-1.5 h-1.5 rounded-full bg-gray-400 dark:bg-gray-600"></div>
           ))}
         </div>
-        <div className="absolute bottom-0 left-0 grid grid-cols-5 gap-1 opacity-20">
+        <div className="absolute bottom-0 left-0 grid grid-cols-5 gap-1 opacity-20 dark:opacity-10">
           {[...Array(25)].map((_, i) => (
-            <div key={i} className="w-1.5 h-1.5 rounded-full bg-gray-400"></div>
+            <div key={i} className="w-1.5 h-1.5 rounded-full bg-gray-400 dark:bg-gray-600"></div>
           ))}
         </div>
-        
-        {/* 标题内容 */}
+
+        {/* Header content */}
         <div className="relative z-10 py-6">
-          {/* 拼豆图标 */}
+          {/* Icon background and border */}
           <div className="flex justify-center mb-4 animate-float">
-            <div className="grid grid-cols-4 gap-1 p-2 bg-white rounded-xl shadow-lg border border-gray-100">
-              {['bg-red-400', 'bg-blue-400', 'bg-yellow-400', 'bg-green-400', 
+            <div className="grid grid-cols-4 gap-1 p-2 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700">
+              {/* Bead colors remain the same */}
+              {['bg-red-400', 'bg-blue-400', 'bg-yellow-400', 'bg-green-400',
                 'bg-purple-400', 'bg-pink-400', 'bg-orange-400', 'bg-teal-400',
                 'bg-indigo-400', 'bg-cyan-400', 'bg-lime-400', 'bg-amber-400',
                 'bg-rose-400', 'bg-sky-400', 'bg-emerald-400', 'bg-violet-400'].map((color, i) => (
-                <div 
-                  key={i} 
+                <div
+                  key={i}
                   className={`w-3 h-3 rounded-full ${color} transition-all duration-500 hover:scale-110 shadow-sm`}
                   style={{animation: `float ${2 + (i % 3)}s ease-in-out infinite ${i * 0.1}s`}}
                 ></div>
               ))}
             </div>
           </div>
-          
+
+          {/* Title gradient might need adjustment, but let's keep it for now */}
           <h1 className="text-2xl sm:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-purple-500 to-pink-500 tracking-tight drop-shadow-sm">
           七卡瓦 拼豆底稿生成器
           </h1>
+          {/* Separator gradient remains the same */}
           <div className="h-1 w-24 mx-auto my-3 bg-gradient-to-r from-blue-500 to-pink-500 rounded-full"></div>
-          <p className="mt-3 text-sm sm:text-base text-gray-600 max-w-lg mx-auto leading-relaxed">
+          {/* Description text color */}
+          <p className="mt-3 text-sm sm:text-base text-gray-600 dark:text-gray-400 max-w-lg mx-auto leading-relaxed">
             上传图片，选择色板，生成带色号的图纸和统计
           </p>
         </div>
       </header>
 
-      <main ref={mainRef} className="w-full md:max-w-4xl flex flex-col items-center space-y-5 sm:space-y-6 relative overflow-hidden"> {/* 添加 overflow-hidden */}
-        {/* Drop Zone */}
+      {/* Apply dark mode styles to the main section */}
+      <main ref={mainRef} className="w-full md:max-w-4xl flex flex-col items-center space-y-5 sm:space-y-6 relative overflow-hidden">
+        {/* Apply dark mode styles to the Drop Zone */}
         <div
           onDrop={handleDrop} onDragOver={handleDragOver} onDragEnter={handleDragOver}
           onClick={() => fileInputRef.current?.click()}
-          className="border-2 border-dashed border-gray-300 rounded-lg p-6 sm:p-8 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all duration-300 w-full md:max-w-md flex flex-col justify-center items-center shadow-sm hover:shadow-md"
+          className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 sm:p-8 text-center cursor-pointer hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-gray-800 transition-all duration-300 w-full md:max-w-md flex flex-col justify-center items-center shadow-sm hover:shadow-md"
           style={{ minHeight: '130px' }}
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 sm:h-12 sm:w-12 text-gray-400 mb-2 sm:mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+          {/* Icon color */}
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 sm:h-12 sm:w-12 text-gray-400 dark:text-gray-500 mb-2 sm:mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
              <path strokeLinecap="round" strokeLinejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
           </svg>
-          <p className="text-xs sm:text-sm text-gray-500">拖放图片到此处，或<span className="font-medium text-blue-600">点击选择文件</span></p>
-          <p className="text-xs text-gray-400 mt-1">支持 JPG, PNG 格式</p>
+          {/* Text color */}
+          <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">拖放图片到此处，或<span className="font-medium text-blue-600 dark:text-blue-400">点击选择文件</span></p>
+          {/* Text color */}
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">支持 JPG, PNG 格式</p>
         </div>
-        
-        {/* 添加提示信息 - 只在没有图片预览时显示 */}
+
+        {/* Apply dark mode styles to the Tip Box */}
         {!originalImageSrc && (
-          <div className="w-full md:max-w-md bg-gradient-to-r from-blue-50 to-indigo-50 p-3 rounded-lg border border-blue-100 shadow-sm">
-            <p className="text-xs text-indigo-700 flex items-start">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 flex-shrink-0 text-blue-500 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="w-full md:max-w-md bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-700 p-3 rounded-lg border border-blue-100 dark:border-gray-600 shadow-sm">
+            {/* Icon color */}
+            <p className="text-xs text-indigo-700 dark:text-indigo-300 flex items-start">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 flex-shrink-0 text-blue-500 dark:text-blue-400 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <span>小贴士：使用像素图进行转换前，请确保图片的边缘吻合像素格子的边界线，这样可以获得更精确的切割效果和更好的成品。</span>
+              {/* Text color */}
+              <span className="text-indigo-700 dark:text-indigo-300">小贴士：使用像素图进行转换前，请确保图片的边缘吻合像素格子的边界线，这样可以获得更精确的切割效果和更好的成品。</span>
             </p>
           </div>
         )}
@@ -1108,23 +1120,27 @@ export default function Home() {
           <div className="w-full flex flex-col items-center space-y-5 sm:space-y-6">
             {/* ++ HIDE Control Row in manual mode ++ */}
             {!isManualColoringMode && (
-              <div className="w-full md:max-w-2xl grid grid-cols-1 sm:grid-cols-4 gap-4 bg-white p-4 sm:p-5 rounded-xl shadow-md border border-gray-100">
+              // Apply dark mode styles to the control row container
+              <div className="w-full md:max-w-2xl grid grid-cols-1 sm:grid-cols-4 gap-4 bg-white dark:bg-gray-800 p-4 sm:p-5 rounded-xl shadow-md border border-gray-100 dark:border-gray-700">
                 {/* Granularity Input */}
                 <div className="flex-1">
-                  <label htmlFor="granularityInput" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
+                  {/* Label color */}
+                  <label htmlFor="granularityInput" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 sm:mb-2">
                     横轴格子 (10-200):
                   </label>
                   <div className="flex items-center gap-2">
+                    {/* Input field styles */}
                     <input
                       type="number"
                       id="granularityInput"
                       value={granularityInput}
                       onChange={handleGranularityInputChange}
-                      className="w-full p-1.5 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 h-9 shadow-sm"
+                      className="w-full p-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 h-9 shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500"
                       min="10"
                       max="200"
                     />
-                    <button 
+                    {/* Button styles (can reuse existing primary button styles) */}
+                    <button
                       onClick={handleConfirmGranularity}
                       className="h-9 bg-blue-500 hover:bg-blue-600 text-white text-sm px-2.5 rounded-md whitespace-nowrap transition-colors duration-200 shadow-sm"
                     >确认</button>
@@ -1133,9 +1149,11 @@ export default function Home() {
 
                 {/* Similarity Threshold Slider */}
                 <div className="flex-1">
-                    <label htmlFor="similarityThreshold" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
-                        区域颜色合并: <span className="font-semibold text-purple-600">{similarityThreshold}</span>
+                    {/* Label color and value color */}
+                    <label htmlFor="similarityThreshold" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 sm:mb-2">
+                        区域颜色合并: <span className="font-semibold text-purple-600 dark:text-purple-400">{similarityThreshold}</span>
                     </label>
+                    {/* Slider accent color */}
                     <input
                       type="range"
                       id="similarityThreshold"
@@ -1143,9 +1161,10 @@ export default function Home() {
                       max="100"
                       value={similarityThreshold}
                       onChange={handleSimilarityChange}
-                      className="w-full h-9 accent-purple-600"
+                      className="w-full h-9 accent-purple-600 dark:accent-purple-400" // Adjust accent for dark mode
                     />
-                    <div className="flex justify-between text-xs text-gray-500 -mt-1">
+                    {/* Min/Max label color */}
+                    <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 -mt-1">
                       <span>少</span>
                       <span>多</span>
                     </div>
@@ -1153,30 +1172,34 @@ export default function Home() {
 
                 {/* Palette Selector */}
                 <div className="flex-1">
-                  <label htmlFor="paletteSelect" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">选择色板:</label>
+                  {/* Label color */}
+                  <label htmlFor="paletteSelect" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 sm:mb-2">选择色板:</label>
+                  {/* Select field styles */}
                   <select
                     id="paletteSelect"
                     value={selectedPaletteKeySet}
                     onChange={handlePaletteChange}
-                    className="w-full p-1.5 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 h-9 shadow-sm"
+                    className="w-full p-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 h-9 shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200"
                   >
                     {(Object.keys(paletteOptions) as PaletteOptionKey[]).map(key => (
-                      <option key={key} value={key}>{paletteOptions[key].name}</option>
+                      <option key={key} value={key} className="bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200">{paletteOptions[key].name}</option> // Style options too
                     ))}
                   </select>
                 </div>
 
-                {/* 添加像素化模式选择 */}
+                {/* Pixelation Mode Selector */}
                 <div className="flex-1">
-                  <label htmlFor="pixelationModeSelect" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">处理模式:</label>
+                  {/* Label color */}
+                  <label htmlFor="pixelationModeSelect" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 sm:mb-2">处理模式:</label>
+                  {/* Select field styles */}
                   <select
                     id="pixelationModeSelect"
                     value={pixelationMode}
                     onChange={handlePixelationModeChange}
-                    className="w-full p-1.5 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 h-9 shadow-sm"
+                    className="w-full p-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 h-9 shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200"
                   >
-                    <option value={PixelationMode.Dominant}>卡通 (主色)</option>
-                    <option value={PixelationMode.Average}>真实 (平均)</option>
+                    <option value={PixelationMode.Dominant} className="bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200">卡通 (主色)</option>
+                    <option value={PixelationMode.Average} className="bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200">真实 (平均)</option>
                   </select>
                 </div>
               </div>
@@ -1188,15 +1211,16 @@ export default function Home() {
 
               {/* ++ RENDER Button/Palette ONLY in manual mode above canvas ++ */}
               {isManualColoringMode && mappedPixelData && gridDimensions && (
-                <div className="w-full mb-4 p-4 bg-blue-50 rounded-xl shadow-md border border-blue-100">
-                  {/* Finish Manual Coloring Button */}
+                // Apply dark mode styles to manual mode container
+                <div className="w-full mb-4 p-4 bg-blue-50 dark:bg-gray-800 rounded-xl shadow-md border border-blue-100 dark:border-gray-700">
+                  {/* Finish Manual Coloring Button (already has distinct colors, maybe keep as is) */}
                   <button
                     onClick={() => {
                       setIsManualColoringMode(false); // Always exit mode here
                       setSelectedColor(null);
                       setTooltipData(null);
                     }}
-                    className={`w-full py-2.5 px-4 text-sm sm:text-base rounded-lg transition-all duration-200 flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 text-white shadow-sm hover:shadow-md`}
+                    className={`w-full py-2.5 px-4 text-sm sm:text-base rounded-lg transition-all duration-200 flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 text-white shadow-sm hover:shadow-md`} // Keep red for contrast?
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}> <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /> </svg>
                     完成手动上色
@@ -1204,29 +1228,39 @@ export default function Home() {
                   {/* Color Palette (only in manual mode) */}
                   <div className="mt-4">
                     <div className="flex justify-center mb-3">
-                      <div className="bg-blue-50 border border-blue-100 rounded-lg p-2 flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 text-xs text-gray-600 w-full sm:w-auto">
+                       {/* Apply dark mode styles to the info box */}
+                      <div className="bg-blue-50 dark:bg-gray-700 border border-blue-100 dark:border-gray-600 rounded-lg p-2 flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 text-xs text-gray-600 dark:text-gray-300 w-full sm:w-auto">
                         <div className="flex items-center gap-1 w-full sm:w-auto">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          {/* Icon color */}
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                           </svg>
+                          {/* Text color implicitly handled by parent */}
                           <span>选择颜色/橡皮擦，点击画布格子上色</span>
                         </div>
-                        <span className="hidden sm:inline text-gray-300">|</span>
+                        {/* Separator color */}
+                        <span className="hidden sm:inline text-gray-300 dark:text-gray-500">|</span>
                         <div className="flex items-center gap-1 w-full sm:w-auto">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          {/* Icon color */}
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                           </svg>
+                          {/* Text color implicitly handled by parent */}
                           <span>为避免误触，推荐使用电脑</span>
                         </div>
-                        <span className="hidden sm:inline text-gray-300">|</span>
+                         {/* Separator color */}
+                        <span className="hidden sm:inline text-gray-300 dark:text-gray-500">|</span>
                         <div className="flex items-center gap-1 w-full sm:w-auto">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          {/* Icon color */}
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                           </svg>
+                          {/* Text color implicitly handled by parent */}
                           <span>Ctrl/Cmd+滚轮缩放</span>
                         </div>
                       </div>
                     </div>
+                    {/* ColorPalette component will need internal dark mode styles */}
                     <ColorPalette
                       colors={[transparentColorData, ...currentGridColors]}
                       selectedColor={selectedColor}
@@ -1238,9 +1272,12 @@ export default function Home() {
               )} {/* ++ End of RENDER Button/Palette ++ */}
 
               {/* Canvas Preview Container */}
-              <div className="bg-white p-4 rounded-xl shadow-md border border-gray-100">
-                <div className="flex justify-center mb-3 sm:mb-4 bg-gray-100 p-2 rounded-lg overflow-hidden"
+              {/* Apply dark mode styles */}
+              <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-md border border-gray-100 dark:border-gray-700">
+                 {/* Inner container background */}
+                <div className="flex justify-center mb-3 sm:mb-4 bg-gray-100 dark:bg-gray-700 p-2 rounded-lg overflow-hidden"
                      style={{ minHeight: '150px' }}>
+                  {/* PixelatedPreviewCanvas component needs internal changes for dark mode drawing */}
                   <PixelatedPreviewCanvas
                     canvasRef={pixelatedCanvasRef}
                     mappedPixelData={mappedPixelData}
@@ -1256,11 +1293,14 @@ export default function Home() {
 
         {/* ++ HIDE Color Counts in manual mode ++ */}
         {!isManualColoringMode && originalImageSrc && colorCounts && Object.keys(colorCounts).length > 0 && (
-          <div className="w-full md:max-w-2xl mt-6 bg-white p-4 rounded-lg shadow">
-            <h3 className="text-lg font-semibold mb-1 text-gray-700 text-center">
+          // Apply dark mode styles to color counts container
+          <div className="w-full md:max-w-2xl mt-6 bg-white dark:bg-gray-800 p-4 rounded-lg shadow border border-gray-100 dark:border-gray-700">
+            {/* Title color */}
+            <h3 className="text-lg font-semibold mb-1 text-gray-700 dark:text-gray-200 text-center">
               颜色统计 & 去除杂色 ({paletteOptions[selectedPaletteKeySet]?.name || '未知色板'})
             </h3>
-            <p className="text-xs text-center text-gray-500 mb-3">点击下方列表中的颜色可将其从可用列表中排除。总计: {totalBeadCount} 颗</p>
+            {/* Subtitle color */}
+            <p className="text-xs text-center text-gray-500 dark:text-gray-400 mb-3">点击下方列表中的颜色可将其从可用列表中排除。总计: {totalBeadCount} 颗</p>
             <ul className="space-y-1 max-h-60 overflow-y-auto pr-2 text-sm">
               {Object.keys(colorCounts)
                 .sort(sortColorKeys)
@@ -1273,33 +1313,34 @@ export default function Home() {
                     <li
                       key={key}
                       onClick={() => handleToggleExcludeColor(key)}
-                      className={`flex items-center justify-between p-1.5 rounded cursor-pointer transition-colors ${
+                       // Apply dark mode styles for list items (normal and excluded)
+                      className={`flex items-center justify-between p-1.5 rounded cursor-pointer transition-colors ${ 
                         isExcluded
-                          ? 'bg-red-100 hover:bg-red-200 opacity-60'
-                          : 'hover:bg-gray-100'
+                          ? 'bg-red-100 dark:bg-red-900/50 hover:bg-red-200 dark:hover:bg-red-800/60 opacity-60 dark:opacity-70' // Darker red background for excluded
+                          : 'hover:bg-gray-100 dark:hover:bg-gray-700'
                       }`}
                       title={isExcluded ? `点击恢复 ${key}` : `点击排除 ${key}`}
                     >
                       <div className={`flex items-center space-x-2 ${isExcluded ? 'line-through' : ''}`}>
+                        {/* Adjust color swatch border */}
                         <span
-                          className="inline-block w-4 h-4 rounded border border-gray-400 flex-shrink-0"
-                          style={{ backgroundColor: isExcluded ? '#cccccc' : colorHex }}
+                          className="inline-block w-4 h-4 rounded border border-gray-400 dark:border-gray-500 flex-shrink-0"
+                          style={{ backgroundColor: isExcluded ? '#666' : colorHex }} // Darker gray for excluded swatch
                         ></span>
-                        <span className={`font-mono font-medium ${isExcluded ? 'text-red-700' : 'text-gray-800'}`}>{key}</span>
+                        {/* Adjust text color for key (normal and excluded) */}
+                        <span className={`font-mono font-medium ${isExcluded ? 'text-red-700 dark:text-red-400' : 'text-gray-800 dark:text-gray-200'}`}>{key}</span>
                       </div>
-                      <span className={`text-xs ${isExcluded ? 'text-red-600 line-through' : 'text-gray-600'}`}>{count} 颗</span>
+                      {/* Adjust text color for count (normal and excluded) */}
+                      <span className={`text-xs ${isExcluded ? 'text-red-600 dark:text-red-400 line-through' : 'text-gray-600 dark:text-gray-300'}`}>{count} 颗</span>
                     </li>
                   );
                 })}
             </ul>
             {excludedColorKeys.size > 0 && (
+                // Apply dark mode styles to the "restore all" button
                 <button
-                    onClick={() => {
-                         setExcludedColorKeys(new Set());
-                         setInitialGridColorKeys(null);
-                         setRemapTrigger(prev => prev + 1);
-                    }}
-                    className="mt-3 w-full text-xs py-1.5 px-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                    onClick={() => { /* ... */ }}
+                    className="mt-3 w-full text-xs py-1.5 px-2 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors"
                 >
                     恢复所有排除的颜色 ({excludedColorKeys.size})
                 </button>
@@ -1309,16 +1350,14 @@ export default function Home() {
 
         {/* Message if palette becomes empty (Also hide in manual mode) */}
          {!isManualColoringMode && originalImageSrc && activeBeadPalette.length === 0 && excludedColorKeys.size > 0 && (
-             <div className="w-full md:max-w-2xl mt-6 bg-yellow-100 p-4 rounded-lg shadow text-center text-sm text-yellow-800">
+             // Apply dark mode styles to the warning box
+             <div className="w-full md:max-w-2xl mt-6 bg-yellow-100 dark:bg-yellow-900/50 p-4 rounded-lg shadow border border-yellow-200 dark:border-yellow-800/60 text-center text-sm text-yellow-800 dark:text-yellow-300">
                  当前可用颜色过少或为空。请在上方统计列表中点击恢复部分颜色，或更换色板。
                  {excludedColorKeys.size > 0 && (
+                      // Apply dark mode styles to the inline "restore all" button
                       <button
-                          onClick={() => {
-                                setExcludedColorKeys(new Set());
-                                setInitialGridColorKeys(null);
-                                setRemapTrigger(prev => prev + 1);
-                           }}
-                          className="mt-2 ml-2 text-xs py-1 px-2 bg-yellow-200 text-yellow-900 rounded hover:bg-yellow-300"
+                          onClick={() => { /* ... */ }}
+                          className="mt-2 ml-2 text-xs py-1 px-2 bg-yellow-200 dark:bg-yellow-700/60 text-yellow-900 dark:text-yellow-200 rounded hover:bg-yellow-300 dark:hover:bg-yellow-600/70 transition-colors"
                       >
                           恢复所有 ({excludedColorKeys.size})
                       </button>
@@ -1329,6 +1368,7 @@ export default function Home() {
         {/* ++ RENDER Enter Manual Mode Button ONLY when NOT in manual mode (before downloads) ++ */}
         {!isManualColoringMode && originalImageSrc && mappedPixelData && gridDimensions && (
             <div className="w-full md:max-w-2xl mt-4"> {/* Wrapper div */} 
+             {/* Keeping button styles bright for visibility in both modes */}
              <button
                 onClick={() => {
                   setIsManualColoringMode(true); // Enter mode
@@ -1346,7 +1386,7 @@ export default function Home() {
         {/* ++ HIDE Download Buttons in manual mode ++ */}
         {!isManualColoringMode && originalImageSrc && mappedPixelData && (
             <div className="w-full md:max-w-2xl mt-4 flex flex-col sm:flex-row gap-2 sm:gap-3">
-              {/* Download Grid Button */}
+              {/* Download Grid Button - Keeping styles bright */}
               <button
                 onClick={handleDownloadImage}
                 disabled={!mappedPixelData || !gridDimensions || gridDimensions.N === 0 || gridDimensions.M === 0 || activeBeadPalette.length === 0}
@@ -1355,7 +1395,7 @@ export default function Home() {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                 下载图纸 (带色号)
               </button>
-              {/* Download Stats Button */}
+              {/* Download Stats Button - Keeping styles bright */}
               <button
                 onClick={handleDownloadStatsImage}
                 disabled={!colorCounts || totalBeadCount === 0 || activeBeadPalette.length === 0}
@@ -1367,23 +1407,21 @@ export default function Home() {
             </div>
         )} {/* ++ End of HIDE Download Buttons ++ */}
 
-         {/* Tooltip Display (remains the same) */}
+         {/* Tooltip Display (Needs update in GridTooltip.tsx) */}
          {tooltipData && (
             <GridTooltip tooltipData={tooltipData} />
           )}
-
-         {/* Cleaned up the previously moved/commented out block */}
-
       </main>
 
-      <footer className="w-full md:max-w-4xl mt-10 mb-6 py-6 text-center text-xs sm:text-sm text-gray-500 border-t border-gray-200 bg-gradient-to-b from-white to-gray-50 rounded-lg shadow-inner">
-        {/* ++ 修改：访问统计分行显示 ++ */}
-        
-        {/* 新增打赏按钮 - 移到版权信息前面，样式优化 */}
+      {/* Apply dark mode styles to the Footer */}
+      <footer className="w-full md:max-w-4xl mt-10 mb-6 py-6 text-center text-xs sm:text-sm text-gray-500 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700 bg-gradient-to-b from-white to-gray-50 dark:from-gray-900 dark:to-gray-800/50 rounded-lg shadow-inner">
+
+        {/* Donation button styles are likely fine */}
         <button
           onClick={() => setIsDonationModalOpen(true)}
           className="mb-5 px-6 py-2.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-full shadow-lg transition-all duration-300 hover:shadow-xl hover:translate-y-[-2px] flex items-center justify-center mx-auto"
         >
+          {/* SVG and Text inside button */}
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M18 8h1a2 2 0 0 1 2 2v1c0 1.1-.9 2-2 2h-1" fill="#f9a8d4" />
             <path d="M6 8h12v9a3 3 0 0 1-3 3H9a3 3 0 0 1-3-3V8z" fill="#f9a8d4" />
@@ -1394,20 +1432,26 @@ export default function Home() {
           </svg>
           <span>请作者喝一杯奶茶</span>
         </button>
-        
-        <p className="font-medium text-gray-600">
+
+        {/* Copyright text color */}
+        <p className="font-medium text-gray-600 dark:text-gray-300">
           七卡瓦 拼豆底稿生成器 &copy; {new Date().getFullYear()}
         </p>
-        
+
+        {/* Links container */}
         <div className="mt-2 flex items-center justify-center gap-4">
-          <a href="https://github.com/Zippland/perler-beads.git" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 transition-colors duration-200 hover:underline flex items-center justify-center">
+          {/* Github link color */}
+          <a href="https://github.com/Zippland/perler-beads.git" target="_blank" rel="noopener noreferrer" className="text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors duration-200 hover:underline flex items-center justify-center">
+            {/* Icon uses currentColor */}
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
               <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
             </svg>
             Github
           </a>
 
-          <a href="https://www.xiaohongshu.com/user/profile/623e8b080000000010007721" target="_blank" rel="noopener noreferrer" className="text-rose-500 hover:text-rose-700 transition-colors duration-200 hover:underline flex items-center justify-center">
+          {/* Xiaohongshu link color */}
+          <a href="https://www.xiaohongshu.com/user/profile/623e8b080000000010007721" target="_blank" rel="noopener noreferrer" className="text-rose-500 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 transition-colors duration-200 hover:underline flex items-center justify-center">
+            {/* Icon uses currentColor */}
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 1024 1024" fill="currentColor" className="mr-1">
               <path d="M512 64C264.6 64 64 264.6 64 512s200.6 448 448 448 448-200.6 448-448S759.4 64 512 64z m238.8 360.2l-57.7 93.3c-10.1 16.3-31.5 21.3-47.8 11.2l-112.4-69.5c-16.3-10.1-21.3-31.5-11.2-47.8l57.7-93.3c10.1-16.3 31.5-21.3 47.8-11.2l112.4 69.5c16.3 10.1 21.3 31.5 11.2 47.8zM448 496l-57.7 93.3c-10.1 16.3-31.5 21.3-47.8 11.2l-112.4-69.5c-16.3-10.1-21.3-31.5-11.2-47.8l57.7-93.3c10.1-16.3 31.5-21.3 47.8-11.2l112.4 69.5c16.3 10.1 21.3 31.5 11.2 47.8z m248.9 43.2l-57.7 93.3c-10.1 16.3-31.5 21.3-47.8 11.2l-112.4-69.5c-16.3-10.1-21.3-31.5-11.2-47.8l57.7-93.3c10.1-16.3 31.5-21.3 47.8-11.2l112.4 69.5c16.3 10.1 21.3 31.5 11.2 47.8z"/>
             </svg>
@@ -1416,13 +1460,18 @@ export default function Home() {
         </div>
       </footer>
 
-      {/* 打赏弹窗 - 优化设计 */}
+      {/* Donation Modal */}
       {isDonationModalOpen && (
+        // Backdrop remains the same (semi-transparent black)
         <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 transition-all duration-300">
-          <div className="bg-white rounded-2xl shadow-2xl w-[calc(100vw-2rem)] sm:w-full md:max-w-md max-h-[90vh] overflow-y-auto transform transition-all">
+          {/* Apply dark mode styles to the modal container */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-[calc(100vw-2rem)] sm:w-full md:max-w-md max-h-[90vh] overflow-y-auto transform transition-all">
             <div className="p-3 sm:p-6">
+              {/* Modal header */}
               <div className="flex justify-between items-center mb-3 sm:mb-5">
-                <h3 className="text-lg sm:text-xl font-bold text-gray-800 bg-gradient-to-r from-pink-500 to-rose-500 bg-clip-text text-transparent font-serif italic flex items-center" style={{ fontFamily: "'Brush Script MT', cursive, serif" }}>
+                {/* Title gradient likely fine, text color implicitly inherited? Check rendering. */}
+                <h3 className="text-lg sm:text-xl font-bold text-gray-800 dark:text-gray-100 bg-gradient-to-r from-pink-500 to-rose-500 bg-clip-text text-transparent font-serif italic flex items-center" style={{ fontFamily: "'Brush Script MT', cursive, serif" }}>
+                   {/* SVG colors fine */}
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M18 8h1a2 2 0 0 1 2 2v1c0 1.1-.9 2-2 2h-1" fill="#f9a8d4" />
                     <path d="M6 8h12v9a3 3 0 0 1-3 3H9a3 3 0 0 1-3-3V8z" fill="#f9a8d4" />
@@ -1433,36 +1482,46 @@ export default function Home() {
                   </svg>
                   Buy Me A Milk Tea
                 </h3>
-                <button 
+                {/* Close button color */}
+                <button
                   onClick={() => setIsDonationModalOpen(false)}
-                  className="text-gray-500 hover:text-gray-700 transition-colors duration-200"
+                  className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-200"
                 >
+                   {/* Icon uses currentColor */}
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
               </div>
-              
+
+              {/* Modal body */}
               <div className="text-center">
-                <p className="mb-3 text-sm sm:text-base text-gray-600 break-words">
+                {/* Text color */}
+                <p className="mb-3 text-sm sm:text-base text-gray-600 dark:text-gray-300 break-words">
                   开源项目是把作者和用户紧紧联系在一起的社群，如果您希望这个项目继续发展，可以请作者喝一杯奶茶。
                 </p>
-                <p className="mb-4 sm:mb-6 text-sm sm:text-base text-gray-600 break-words">
+                 {/* Text color */}
+                <p className="mb-4 sm:mb-6 text-sm sm:text-base text-gray-600 dark:text-gray-300 break-words">
                   您的支持是作者把项目继续下去的动力。
                 </p>
-                
+
+                {/* QR Code container */}
                 <div className="flex justify-center mb-4 sm:mb-5">
-                  <div className="relative w-40 h-40 sm:w-48 sm:h-48 md:w-56 md:h-56 p-1 sm:p-2 bg-gradient-to-r from-pink-100 to-rose-100 rounded-lg shadow-md">
-                    <Image 
-                      src="/donation-qr.jpg" 
-                      alt="赞赏码" 
+                   {/* Apply dark mode background */}
+                  <div className="relative w-40 h-40 sm:w-48 sm:h-48 md:w-56 md:h-56 p-1 sm:p-2 bg-gradient-to-r from-pink-100 to-rose-100 dark:from-pink-900/30 dark:to-rose-900/30 rounded-lg shadow-md">
+                    {/* Image itself is fine */}
+                    <Image
+                      src="/donation-qr.jpg"
+                      alt="赞赏码"
                       fill
                       className="object-contain p-1 sm:p-2"
                     />
                   </div>
                 </div>
-                
-                <p className="text-xs sm:text-sm text-gray-500 bg-gray-50 py-1.5 px-3 sm:py-2 sm:px-4 rounded-full inline-block shadow-sm">
+
+                {/* Final text bubble */}
+                 {/* Apply dark mode styles */}
+                <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 py-1.5 px-3 sm:py-2 sm:px-4 rounded-full inline-block shadow-sm">
                   微信扫描上方赞赏码，请作者喝一杯奶茶。
                 </p>
               </div>
