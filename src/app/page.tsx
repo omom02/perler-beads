@@ -1392,7 +1392,7 @@ export default function Home() {
             <path d="M9.5 14.5L9 16" stroke="#7d2a5a" />
             <path d="M14.5 14.5L15 16" stroke="#7d2a5a" />
           </svg>
-          <span className="font-serif italic" style={{ fontFamily: "'Brush Script MT', cursive, serif" }}>Buy Me A Milk Tea</span>
+          <span>请作者喝一杯奶茶</span>
         </button>
         
         <p className="font-medium text-gray-600">
@@ -1445,10 +1445,10 @@ export default function Home() {
               
               <div className="text-center">
                 <p className="mb-3 text-sm sm:text-base text-gray-600 break-words">
-                  开源社群是作者和用户共同构建的，如果您希望这个项目继续发展，可以请我喝一杯奶茶。
+                  开源项目是把作者和用户紧紧联系在一起的社群，如果您希望这个项目继续发展，可以请作者喝一杯奶茶。
                 </p>
                 <p className="mb-4 sm:mb-6 text-sm sm:text-base text-gray-600 break-words">
-                  您的支持是这个项目继续下去的唯一动力。
+                  您的支持是作者把项目继续下去的动力。
                 </p>
                 
                 <div className="flex justify-center mb-4 sm:mb-5">
@@ -1463,7 +1463,7 @@ export default function Home() {
                 </div>
                 
                 <p className="text-xs sm:text-sm text-gray-500 bg-gray-50 py-1.5 px-3 sm:py-2 sm:px-4 rounded-full inline-block shadow-sm">
-                  微信扫描上方赞赏码，请我喝一杯奶茶。
+                  微信扫描上方赞赏码，请作者喝一杯奶茶。
                 </p>
               </div>
             </div>
