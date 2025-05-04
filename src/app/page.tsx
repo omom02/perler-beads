@@ -118,12 +118,15 @@ const BACKGROUND_COLOR_KEYS = ['T1', 'H1', 'H2']; // 可以根据需要调整
 // 1. 导入新组件
 import PixelatedPreviewCanvas from '../components/PixelatedPreviewCanvas';
 import GridTooltip from '../components/GridTooltip';
+import CustomPaletteEditor from '../components/CustomPaletteEditor';
+import { loadPaletteSelections, savePaletteSelections, presetToSelections, PaletteSelections } from '../utils/localStorageUtils';
 
 export default function Home() {
   const [originalImageSrc, setOriginalImageSrc] = useState<string | null>(null);
   const [granularity, setGranularity] = useState<number>(50);
   const [granularityInput, setGranularityInput] = useState<string>("50");
   const [similarityThreshold, setSimilarityThreshold] = useState<number>(30);
+  const [similarityThresholdInput, setSimilarityThresholdInput] = useState<string>("30");
   // 添加像素化模式状态
   const [pixelationMode, setPixelationMode] = useState<PixelationMode>(PixelationMode.Dominant); // 默认为卡通模式
   const [selectedPaletteKeySet, setSelectedPaletteKeySet] = useState<PaletteOptionKey>('all');
@@ -146,6 +149,9 @@ export default function Home() {
   const [selectedColor, setSelectedColor] = useState<MappedPixel | null>(null);
   // 新增状态变量：控制打赏弹窗
   const [isDonationModalOpen, setIsDonationModalOpen] = useState<boolean>(false);
+  const [customPaletteSelections, setCustomPaletteSelections] = useState<PaletteSelections>({});
+  const [isCustomPaletteEditorOpen, setIsCustomPaletteEditorOpen] = useState<boolean>(false);
+  const [isCustomPalette, setIsCustomPalette] = useState<boolean>(false);
 
   const originalCanvasRef = useRef<HTMLCanvasElement>(null);
   const pixelatedCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -170,10 +176,11 @@ export default function Home() {
     setActiveBeadPalette(newActiveBeadPalette);
   }, [selectedPaletteKeySet, excludedColorKeys, remapTrigger]); // ++ 添加 remapTrigger 依赖 ++
 
-  // ++ 添加：当granularity状态改变时同步更新输入框的值 ++
+  // ++ 添加：当状态变化时同步更新输入框的值 ++
   useEffect(() => {
     setGranularityInput(granularity.toString());
-  }, [granularity]);
+    setSimilarityThresholdInput(similarityThreshold.toString());
+  }, [granularity, similarityThreshold]);
 
   // ++ Calculate unique colors currently on the grid for the palette ++
   const currentGridColors = useMemo(() => {
@@ -189,6 +196,33 @@ export default function Home() {
     return Array.from(uniqueColorsMap.values()).sort((a, b) => sortColorKeys(a.key, b.key));
   }, [mappedPixelData]); // Recalculate when pixel data changes
 
+  // 初始化时从本地存储加载自定义色板选择
+  useEffect(() => {
+    // 尝试从localStorage加载
+    const savedSelections = loadPaletteSelections();
+    if (savedSelections && Object.keys(savedSelections).length > 0) {
+      setCustomPaletteSelections(savedSelections);
+      setIsCustomPalette(true);
+    } else {
+      // 如果没有保存的选择，用当前预设初始化
+      const initialSelections = presetToSelections(
+        allPaletteKeys,
+        paletteOptions[selectedPaletteKeySet]?.keys || []
+      );
+      setCustomPaletteSelections(initialSelections);
+      setIsCustomPalette(false);
+    }
+  }, []);
+
+  // 更新 activeBeadPalette 基于自定义选择和排除列表
+  useEffect(() => {
+    const newActiveBeadPalette = fullBeadPalette.filter(color => {
+      const isSelectedInCustomPalette = customPaletteSelections[color.key];
+      const isNotExcluded = !excludedColorKeys.has(color.key);
+      return isSelectedInCustomPalette && isNotExcluded;
+    });
+    setActiveBeadPalette(newActiveBeadPalette);
+  }, [customPaletteSelections, excludedColorKeys, fullBeadPalette, remapTrigger]);
 
   // --- Event Handlers ---
 
@@ -251,8 +285,14 @@ export default function Home() {
     setGranularityInput(event.target.value);
   };
 
-  // ++ 新增：处理确认按钮点击的函数 ++
-  const handleConfirmGranularity = () => {
+  // ++ 添加：处理相似度输入框变化的函数 ++
+  const handleSimilarityThresholdInputChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setSimilarityThresholdInput(event.target.value);
+  };
+
+  // ++ 修改：处理确认按钮点击的函数，同时处理两个参数 ++
+  const handleConfirmParameters = () => {
+    // 处理格子数
     const minGranularity = 10;
     const maxGranularity = 200;
     let newGranularity = parseInt(granularityInput, 10);
@@ -263,33 +303,66 @@ export default function Home() {
       newGranularity = maxGranularity;
     }
 
-    // 只有在值确实改变时才触发更新
-    if (newGranularity !== granularity) {
+    // 处理相似度阈值
+    const minSimilarity = 0;
+    const maxSimilarity = 100;
+    let newSimilarity = parseInt(similarityThresholdInput, 10);
+    
+    if (isNaN(newSimilarity) || newSimilarity < minSimilarity) {
+      newSimilarity = minSimilarity;
+    } else if (newSimilarity > maxSimilarity) {
+      newSimilarity = maxSimilarity;
+    }
+
+    // 检查值是否有变化
+    const granularityChanged = newGranularity !== granularity;
+    const similarityChanged = newSimilarity !== similarityThreshold;
+    
+    if (granularityChanged) {
       console.log(`Confirming new granularity: ${newGranularity}`);
-      setGranularity(newGranularity); // 更新主状态
-      setRemapTrigger(prev => prev + 1); // 触发重映射
-      // ++ Exit manual coloring mode if parameters change ++
+      setGranularity(newGranularity);
+    }
+    
+    if (similarityChanged) {
+      console.log(`Confirming new similarity threshold: ${newSimilarity}`);
+      setSimilarityThreshold(newSimilarity);
+    }
+    
+    // 只有在有值变化时才触发重映射
+    if (granularityChanged || similarityChanged) {
+      setRemapTrigger(prev => prev + 1);
+      // 退出手动上色模式
       setIsManualColoringMode(false);
       setSelectedColor(null);
     }
 
-    // 总是将输入框的值同步为验证后的值（避免显示非法值）
+    // 始终同步输入框的值
     setGranularityInput(newGranularity.toString());
+    setSimilarityThresholdInput(newSimilarity.toString());
   };
 
    const handlePaletteChange = (event: ChangeEvent<HTMLSelectElement>) => {
-     const newKey = event.target.value as PaletteOptionKey;
-     if (paletteOptions[newKey]) {
-         setSelectedPaletteKeySet(newKey);
-         setExcludedColorKeys(new Set()); // ++ 重置排除列表 ++
-         setRemapTrigger(prev => prev + 1); // Trigger full remap
-     } else {
-         console.warn(`Attempted to select invalid palette key: ${newKey}. Keeping current selection.`);
-     }
-     // ++ Exit manual coloring mode if palette changes ++
-     setIsManualColoringMode(false);
-     setSelectedColor(null);
-   };
+    const newKey = event.target.value as PaletteOptionKey;
+    if (paletteOptions[newKey]) {
+      setSelectedPaletteKeySet(newKey);
+      
+      // 更新自定义色板选择
+      const newSelections = presetToSelections(
+        allPaletteKeys,
+        paletteOptions[newKey]?.keys || []
+      );
+      setCustomPaletteSelections(newSelections);
+      setIsCustomPalette(false);
+      
+      setExcludedColorKeys(new Set()); // 重置排除列表
+      setRemapTrigger(prev => prev + 1); // 触发重新映射
+    } else {
+      console.warn(`Attempted to select invalid palette key: ${newKey}. Keeping current selection.`);
+    }
+    // 退出手动上色模式
+    setIsManualColoringMode(false);
+    setSelectedColor(null);
+  };
 
   const handleSimilarityChange = (event: ChangeEvent<HTMLInputElement>) => {
     setSimilarityThreshold(parseInt(event.target.value, 10));
@@ -370,7 +443,7 @@ export default function Home() {
       originalCtx.drawImage(img, 0, 0, img.width, img.height);
       console.log("Original image drawn.");
 
-      // 使用calculatePixelGrid替换原来的颜色映射逻辑
+      // 1. 使用calculatePixelGrid进行初始颜色映射
       console.log("Starting initial color mapping using calculatePixelGrid...");
       const initialMappedData = calculatePixelGrid(
           originalCtx,
@@ -382,98 +455,110 @@ export default function Home() {
           mode,
           t1FallbackColor
       );
-      console.log(`Initial data mapping complete using mode ${mode}. Starting region merging...`);
+      console.log(`Initial data mapping complete using mode ${mode}. Starting global color merging...`);
 
-      // --- Region Merging Step ---
+      // --- 新的全局颜色合并逻辑 ---
       const keyToRgbMap = new Map<string, RgbColor>();
-      currentPalette.forEach(p => keyToRgbMap.set(p.key, p.rgb));
-      const visited: boolean[][] = Array(M).fill(null).map(() => Array(N).fill(false));
-      const mergedData: MappedPixel[][] = Array(M).fill(null).map(() => Array(N).fill({ key: t1FallbackColor.key, color: t1FallbackColor.hex, isExternal: false }));
-      const similarityThresholdValue = threshold;
+      const keyToColorDataMap = new Map<string, PaletteColor>();
+      currentPalette.forEach(p => {
+        keyToRgbMap.set(p.key, p.rgb);
+        keyToColorDataMap.set(p.key, p);
+      });
 
-      for (let j = 0; j < M; j++) {
-        for (let i = 0; i < N; i++) {
-          if (visited[j][i]) continue;
-
-          const startCellData = initialMappedData[j][i];
-          const startRgb = keyToRgbMap.get(startCellData.key);
-
-          if (!startRgb) {
-             console.warn(`RGB not found for key ${startCellData.key} at (${j},${i}) during merging. Using fallback.`);
-             visited[j][i] = true;
-             mergedData[j][i] = { key: t1FallbackColor.key, color: t1FallbackColor.hex, isExternal: false };
-             continue;
+      // 2. 统计初始颜色数量 (排除背景色)
+      const initialColorCounts: { [key: string]: number } = {};
+      initialMappedData.flat().forEach(cell => {
+          if (cell && cell.key && !BACKGROUND_COLOR_KEYS.includes(cell.key)) {
+              initialColorCounts[cell.key] = (initialColorCounts[cell.key] || 0) + 1;
           }
+      });
+      console.log("Initial color counts (excluding background):", initialColorCounts);
 
-          const currentRegionCells: { r: number; c: number }[] = [];
-          const beadKeyCountsInRegion: { [key: string]: number } = {};
-          const queue: { r: number; c: number }[] = [{ r: j, c: i }];
-          visited[j][i] = true;
+      // 3. 创建一个颜色排序列表，按出现频率从高到低排序
+      const colorsByFrequency = Object.entries(initialColorCounts)
+          .sort((a, b) => b[1] - a[1])  // 按频率降序排序
+          .map(entry => entry[0]);      // 只保留颜色键
+      
+      if (colorsByFrequency.length === 0) {
+          console.log("No non-background colors found! Skipping merging.");
+      }
 
-          while (queue.length > 0) {
-              const { r, c } = queue.shift()!;
-              const currentCellData = initialMappedData[r][c];
-              const currentRgb = keyToRgbMap.get(currentCellData.key);
-
-              if (!currentRgb) {
-                   console.warn(`RGB not found for key ${currentCellData.key} at (${r},${c}) during BFS. Skipping.`);
-                   continue;
+      console.log("Colors sorted by frequency:", colorsByFrequency);
+      
+      // 4. 复制初始数据，准备合并
+      const mergedData: MappedPixel[][] = initialMappedData.map(row => 
+          row.map(cell => ({...cell, isExternal: false}))
+      );
+      
+      // 5. 处理相似颜色合并
+      const similarityThresholdValue = threshold;
+      
+      // 已被合并（替换）的颜色集合
+      const replacedColors = new Set<string>();
+      
+      // 对每个颜色按频率从高到低处理
+      for (let i = 0; i < colorsByFrequency.length; i++) {
+          const currentKey = colorsByFrequency[i];
+          
+          // 如果当前颜色已经被合并到更频繁的颜色中，跳过
+          if (replacedColors.has(currentKey)) continue;
+          
+          const currentRgb = keyToRgbMap.get(currentKey);
+          if (!currentRgb) {
+              console.warn(`RGB not found for key ${currentKey}. Skipping.`);
+              continue;
+          }
+          
+          // 检查剩余的低频颜色
+          for (let j = i + 1; j < colorsByFrequency.length; j++) {
+              const lowerFreqKey = colorsByFrequency[j];
+              
+              // 如果低频颜色已被替换，跳过
+              if (replacedColors.has(lowerFreqKey)) continue;
+              
+              const lowerFreqRgb = keyToRgbMap.get(lowerFreqKey);
+              if (!lowerFreqRgb) {
+                  console.warn(`RGB not found for key ${lowerFreqKey}. Skipping.`);
+                  continue;
               }
-
-              const dist = colorDistance(startRgb, currentRgb);
-
+              
+              // 计算颜色距离
+              const dist = colorDistance(currentRgb, lowerFreqRgb);
+              
+              // 如果距离小于阈值，将低频颜色替换为高频颜色
               if (dist < similarityThresholdValue) {
-                  currentRegionCells.push({ r, c });
-                  beadKeyCountsInRegion[currentCellData.key] = (beadKeyCountsInRegion[currentCellData.key] || 0) + 1;
-
-                  const neighbors = [ { nr: r + 1, nc: c }, { nr: r - 1, nc: c }, { nr: r, nc: c + 1 }, { nr: r, nc: c - 1 } ];
-                  for (const { nr, nc } of neighbors) {
-                      if (nr >= 0 && nr < M && nc >= 0 && nc < N && !visited[nr][nc]) {
-                          const neighborCellData = initialMappedData[nr][nc];
-                          const neighborRgb = keyToRgbMap.get(neighborCellData.key);
-                          if (neighborRgb && colorDistance(startRgb, neighborRgb) < similarityThresholdValue) {
-                              visited[nr][nc] = true;
-                              queue.push({ r: nr, c: nc });
+                  console.log(`Merging color ${lowerFreqKey} into ${currentKey} (Distance: ${dist.toFixed(2)})`);
+                  
+                  // 标记这个颜色已被替换
+                  replacedColors.add(lowerFreqKey);
+                  
+                  // 替换所有使用这个低频颜色的单元格
+                  for (let r = 0; r < M; r++) {
+                      for (let c = 0; c < N; c++) {
+                          if (mergedData[r][c].key === lowerFreqKey) {
+                              const colorData = keyToColorDataMap.get(currentKey);
+                              if (colorData) {
+                                  mergedData[r][c] = {
+                                      key: currentKey,
+                                      color: colorData.hex,
+                                      isExternal: false
+                                  };
+                              }
                           }
                       }
                   }
               }
           }
-
-          // --- Determine Dominant Color and Recolor the Region ---
-          if (currentRegionCells.length > 0) {
-              let dominantKey = '';
-              let maxCount = 0;
-              for (const key in beadKeyCountsInRegion) {
-                  if (beadKeyCountsInRegion[key] > maxCount) {
-                      maxCount = beadKeyCountsInRegion[key];
-                      dominantKey = key;
-                  }
-              }
-              if (!dominantKey) {
-                  dominantKey = startCellData.key;
-                  console.warn(`No dominant key found for region starting at (${j},${i}), using start cell key: ${dominantKey}`);
-              }
-
-              const dominantColorData = currentPalette.find(p => p.key === dominantKey);
-              if (dominantColorData) {
-                  const dominantColorHex = dominantColorData.hex;
-                  currentRegionCells.forEach(({ r, c }) => {
-                      mergedData[r][c] = { key: dominantKey, color: dominantColorHex, isExternal: false };
-                  });
-              } else {
-                   console.warn(`Dominant key "${dominantKey}" determined but not found in *active* palette during merge. Using fallback.`);
-                   currentRegionCells.forEach(({ r, c }) => {
-                       mergedData[r][c] = { key: t1FallbackColor.key, color: t1FallbackColor.hex, isExternal: false };
-                   });
-              }
-          } else {
-              mergedData[j][i] = { ...startCellData, isExternal: false };
-          }
-        }
       }
       
-      console.log("Region merging complete. Starting background removal.");
+      if (replacedColors.size > 0) {
+          console.log(`Merged ${replacedColors.size} less frequent similar colors into more frequent ones.`);
+      } else {
+          console.log("No colors were similar enough to merge.");
+      }
+      // --- 结束新的全局颜色合并逻辑 ---
+      
+      console.log("Global color merging complete. Starting background removal.");
 
       // --- Flood Fill Background Process ---
       // ... 保持洪水填充算法不变，但在mergedData上操作 ...
@@ -597,7 +682,7 @@ export default function Home() {
         // setTotalBeadCount(0);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [originalImageSrc, granularity, similarityThreshold, selectedPaletteKeySet, pixelationMode, remapTrigger]); // 添加pixelationMode到依赖数组
+  }, [originalImageSrc, granularity, similarityThreshold, customPaletteSelections, pixelationMode, remapTrigger]);
 
     // --- Download function (ensure filename includes palette) ---
     const handleDownloadImage = () => {
@@ -979,6 +1064,46 @@ export default function Home() {
     }
   };
 
+  // 处理自定义色板中单个颜色的选择变化
+  const handleSelectionChange = (key: string, isSelected: boolean) => {
+    setCustomPaletteSelections(prev => ({
+      ...prev,
+      [key]: isSelected
+    }));
+    setIsCustomPalette(true);
+  };
+
+  // 应用预设到自定义色板
+  const handleApplyPreset = (presetKey: string) => {
+    // 检查是否为有效的预设键
+    if (!Object.keys(paletteOptions).includes(presetKey)) {
+      console.warn(`无效的预设键: ${presetKey}`);
+      return;
+    }
+    
+    const typedPresetKey = presetKey as PaletteOptionKey;
+    const newSelections = presetToSelections(
+      allPaletteKeys,
+      paletteOptions[typedPresetKey].keys || []
+    );
+    setCustomPaletteSelections(newSelections);
+    setSelectedPaletteKeySet(typedPresetKey);
+    setIsCustomPalette(false);
+    setIsCustomPaletteEditorOpen(false);
+  };
+
+  // 保存自定义色板并应用
+  const handleSaveCustomPalette = () => {
+    savePaletteSelections(customPaletteSelections);
+    setIsCustomPalette(true);
+    setIsCustomPaletteEditorOpen(false);
+    // 触发图像重新处理
+    setRemapTrigger(prev => prev + 1);
+    // 退出手动上色模式
+    setIsManualColoringMode(false);
+    setSelectedColor(null);
+  };
+
   return (
     <>
     {/* 添加自定义动画样式 */}
@@ -1139,13 +1264,13 @@ export default function Home() {
           <div className="w-full flex flex-col items-center space-y-5 sm:space-y-6">
             {/* ++ HIDE Control Row in manual mode ++ */}
             {!isManualColoringMode && (
-              // Apply dark mode styles to the control row container
-              <div className="w-full md:max-w-2xl grid grid-cols-1 sm:grid-cols-4 gap-4 bg-white dark:bg-gray-800 p-4 sm:p-5 rounded-xl shadow-md border border-gray-100 dark:border-gray-700">
+              /* 修改控制面板网格布局 */
+              <div className="w-full md:max-w-2xl grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white dark:bg-gray-800 p-4 sm:p-5 rounded-xl shadow-md border border-gray-100 dark:border-gray-700">
                 {/* Granularity Input */}
                 <div className="flex-1">
                   {/* Label color */}
                   <label htmlFor="granularityInput" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 sm:mb-2">
-                    横轴格子 (10-200):
+                    横轴切割数量 (10-200):
                   </label>
                   <div className="flex items-center gap-2">
                     {/* Input field styles */}
@@ -1158,71 +1283,89 @@ export default function Home() {
                       min="10"
                       max="200"
                     />
-                    {/* Button styles (can reuse existing primary button styles) */}
-                    <button
-                      onClick={handleConfirmGranularity}
-                      className="h-9 bg-blue-500 hover:bg-blue-600 text-white text-sm px-2.5 rounded-md whitespace-nowrap transition-colors duration-200 shadow-sm"
-                    >确认</button>
                   </div>
                 </div>
 
-                {/* Similarity Threshold Slider */}
+                {/* Similarity Threshold Input */}
                 <div className="flex-1">
-                    {/* Label color and value color */}
-                    <label htmlFor="similarityThreshold" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 sm:mb-2">
-                        区域颜色合并: <span className="font-semibold text-purple-600 dark:text-purple-400">{similarityThreshold}</span>
+                    {/* Label color */}
+                    <label htmlFor="similarityThresholdInput" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 sm:mb-2">
+                        颜色合并阈值 (0-100):
                     </label>
-                    {/* Slider accent color */}
-                    <input
-                      type="range"
-                      id="similarityThreshold"
-                      min="0"
-                      max="100"
-                      value={similarityThreshold}
-                      onChange={handleSimilarityChange}
-                      className="w-full h-9 accent-purple-600 dark:accent-purple-400" // Adjust accent for dark mode
-                    />
-                    {/* Min/Max label color */}
-                    <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 -mt-1">
-                      <span>少</span>
-                      <span>多</span>
+                    <div className="flex items-center gap-2">
+                      {/* Input field styles */}
+                      <input
+                        type="number"
+                        id="similarityThresholdInput"
+                        value={similarityThresholdInput}
+                        onChange={handleSimilarityThresholdInputChange}
+                        className="w-full p-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 h-9 shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500"
+                        min="0"
+                        max="100"
+                      />
                     </div>
                 </div>
 
-                {/* Palette Selector */}
-                <div className="flex-1">
-                  {/* Label color */}
-                  <label htmlFor="paletteSelect" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 sm:mb-2">选择色板:</label>
-                  {/* Select field styles */}
-                  <select
-                    id="paletteSelect"
-                    value={selectedPaletteKeySet}
-                    onChange={handlePaletteChange}
-                    className="w-full p-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 h-9 shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200"
-                  >
-                    {(Object.keys(paletteOptions) as PaletteOptionKey[]).map(key => (
-                      <option key={key} value={key} className="bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200">{paletteOptions[key].name}</option> // Style options too
-                    ))}
-                  </select>
-                </div>
-
                 {/* Pixelation Mode Selector */}
-                <div className="flex-1">
+                <div className="sm:col-span-2">
                   {/* Label color */}
                   <label htmlFor="pixelationModeSelect" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 sm:mb-2">处理模式:</label>
-                  {/* Select field styles */}
-                  <select
-                    id="pixelationModeSelect"
-                    value={pixelationMode}
-                    onChange={handlePixelationModeChange}
-                    className="w-full p-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 h-9 shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200"
+                  <div className="flex items-center gap-2">
+                    {/* Select field styles */}
+                    <select
+                      id="pixelationModeSelect"
+                      value={pixelationMode}
+                      onChange={handlePixelationModeChange}
+                      className="w-full p-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 h-9 shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200"
+                    >
+                      <option value={PixelationMode.Dominant} className="bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200">卡通 (主色)</option>
+                      <option value={PixelationMode.Average} className="bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200">真实 (平均)</option>
+                    </select>
+                    
+                    {/* 确认按钮 - 现在对应两个输入框 */}
+                    <button
+                      onClick={handleConfirmParameters}
+                      className="h-9 bg-blue-500 hover:bg-blue-600 text-white text-sm px-3 rounded-md whitespace-nowrap transition-colors duration-200 shadow-sm flex-shrink-0"
+                    >应用设置</button>
+                  </div>
+                </div>
+
+                {/* 自定义色板按钮 */}
+                <div className="sm:col-span-2 mt-3">
+                  <button
+                    onClick={() => setIsCustomPaletteEditorOpen(true)}
+                    className="w-full py-2.5 px-3 flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white font-medium rounded-lg shadow-sm transition-all duration-200 hover:shadow-md hover:from-blue-600 hover:to-purple-600"
                   >
-                    <option value={PixelationMode.Dominant} className="bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200">卡通 (主色)</option>
-                    <option value={PixelationMode.Average} className="bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200">真实 (平均)</option>
-                  </select>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M4 2a2 2 0 00-2 2v11a3 3 0 106 0V4a2 2 0 00-2-2H4zm1 14a1 1 0 100-2 1 1 0 000 2zm5-1.757l4.9-4.9a2 2 0 000-2.828L13.485 5.1a2 2 0 00-2.828 0L10 5.757v8.486zM16 18H9.071l6-6H16a2 2 0 012 2v2a2 2 0 01-2 2z" clipRule="evenodd" />
+                    </svg>
+                    管理色板 ({Object.values(customPaletteSelections).filter(Boolean).length} 色)
+                  </button>
+                  {isCustomPalette && (
+                    <p className="text-xs text-center text-blue-500 dark:text-blue-400 mt-1.5">当前使用自定义色板</p>
+                  )}
                 </div>
               </div>
-            )} {/* ++ End of HIDE Control Row ++ */}
+            )}
+
+            {/* 自定义色板编辑器弹窗 - 这是新增的部分 */}
+            {isCustomPaletteEditorOpen && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 flex justify-center items-center p-4">
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+                  <div className="p-4 sm:p-6">
+                    <CustomPaletteEditor
+                      allColors={fullBeadPalette}
+                      currentSelections={customPaletteSelections}
+                      onSelectionChange={handleSelectionChange}
+                      onApplyPreset={handleApplyPreset}
+                      onSaveCustomPalette={handleSaveCustomPalette}
+                      onClose={() => setIsCustomPaletteEditorOpen(false)}
+                      paletteOptions={paletteOptions}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Output Section */}
             <div className="w-full md:max-w-2xl">
@@ -1316,7 +1459,7 @@ export default function Home() {
           <div className="w-full md:max-w-2xl mt-6 bg-white dark:bg-gray-800 p-4 rounded-lg shadow border border-gray-100 dark:border-gray-700">
             {/* Title color */}
             <h3 className="text-lg font-semibold mb-1 text-gray-700 dark:text-gray-200 text-center">
-              颜色统计 & 去除杂色 ({paletteOptions[selectedPaletteKeySet]?.name || '未知色板'})
+              去除杂色 
             </h3>
             {/* Subtitle color */}
             <p className="text-xs text-center text-gray-500 dark:text-gray-400 mb-3">点击下方列表中的颜色可将其从可用列表中排除。总计: {totalBeadCount} 颗</p>
@@ -1358,7 +1501,16 @@ export default function Home() {
             {excludedColorKeys.size > 0 && (
                 // Apply dark mode styles to the "restore all" button
                 <button
-                    onClick={() => { /* ... */ }}
+                    onClick={() => {
+                      // 清空排除的颜色
+                      setExcludedColorKeys(new Set());
+                      // 触发重新映射
+                      setRemapTrigger(prev => prev + 1);
+                      // 退出手动上色模式
+                      setIsManualColoringMode(false);
+                      setSelectedColor(null);
+                      console.log("Restored all excluded colors");
+                    }}
                     className="mt-3 w-full text-xs py-1.5 px-2 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors"
                 >
                     恢复所有排除的颜色 ({excludedColorKeys.size})
@@ -1375,7 +1527,16 @@ export default function Home() {
                  {excludedColorKeys.size > 0 && (
                       // Apply dark mode styles to the inline "restore all" button
                       <button
-                          onClick={() => { /* ... */ }}
+                          onClick={() => {
+                            // 清空排除的颜色
+                            setExcludedColorKeys(new Set());
+                            // 触发重新映射
+                            setRemapTrigger(prev => prev + 1);
+                            // 退出手动上色模式
+                            setIsManualColoringMode(false);
+                            setSelectedColor(null);
+                            console.log("Restored all excluded colors");
+                          }}
                           className="mt-2 ml-2 text-xs py-1 px-2 bg-yellow-200 dark:bg-yellow-700/60 text-yellow-900 dark:text-yellow-200 rounded hover:bg-yellow-300 dark:hover:bg-yellow-600/70 transition-colors"
                       >
                           恢复所有 ({excludedColorKeys.size})
