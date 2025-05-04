@@ -175,7 +175,7 @@ export default function Home() {
       return isInSelectedPalette && isNotExcluded;
     });
     setActiveBeadPalette(newActiveBeadPalette);
-  }, [selectedPaletteKeySet, excludedColorKeys, remapTrigger]); // ++ 添加 remapTrigger 依赖 ++
+  }, [selectedPaletteKeySet, excludedColorKeys, remapTrigger]); 
 
   // ++ 添加：当状态变化时同步更新输入框的值 ++
   useEffect(() => {
@@ -223,7 +223,7 @@ export default function Home() {
       return isSelectedInCustomPalette && isNotExcluded;
     });
     setActiveBeadPalette(newActiveBeadPalette);
-  }, [customPaletteSelections, excludedColorKeys, fullBeadPalette, remapTrigger]);
+  }, [customPaletteSelections, excludedColorKeys, remapTrigger]);
 
   // --- Event Handlers ---
 
