@@ -83,8 +83,9 @@ const PixelatedPreviewCanvas: React.FC<PixelatedPreviewCanvasProps> = ({
   canvasRef,
   onInteraction,
 }) => {
-  // Add a state to trigger redraw when dark mode changes
   const [darkModeState, setDarkModeState] = useState<boolean | null>(null);
+  const touchStartPosRef = useRef<{ x: number; y: number; pageX: number; pageY: number } | null>(null);
+  const touchMovedRef = useRef<boolean>(false);
 
   // Effect to detect dark mode changes and update state
   useEffect(() => {
@@ -123,53 +124,46 @@ const PixelatedPreviewCanvas: React.FC<PixelatedPreviewCanvasProps> = ({
   
   // 鼠标移动时显示提示
   const handleMouseMove = (event: MouseEvent<HTMLCanvasElement>) => {
-    onInteraction(event.clientX, event.clientY, event.pageX, event.pageY, false);
+    // 只有在非手动模式下才通过mousemove显示tooltip，避免干扰手动上色
+    if (!isManualColoringMode) {
+        onInteraction(event.clientX, event.clientY, event.pageX, event.pageY, false);
+    }
   };
 
   // 鼠标离开时隐藏提示
   const handleMouseLeave = () => {
+    // 鼠标离开时总是隐藏tooltip
     onInteraction(0, 0, 0, 0, false, true);
   };
 
   // 鼠标点击处理（用于手动上色模式）
   const handleClick = (event: MouseEvent<HTMLCanvasElement>) => {
-    if (isManualColoringMode) {
-      onInteraction(event.clientX, event.clientY, event.pageX, event.pageY, true);
-    } else {
-      // 在非手动上色模式下，鼠标点击也会切换 Tooltip 的显示状态
-      // 主要用于笔记本电脑或带鼠标的平板，主要显示/隐藏逻辑在 page.tsx 处理
-      onInteraction(event.clientX, event.clientY, event.pageX, event.pageY, false);
-    }
+    // 鼠标点击行为保持不变：
+    // 手动模式下：上色
+    // 非手动模式下：切换tooltip
+    onInteraction(event.clientX, event.clientY, event.pageX, event.pageY, isManualColoringMode);
   };
 
   // --- 触摸事件处理 ---
   // 用于检测触摸移动的参考
-  const touchStartPosRef = useRef<{ x: number; y: number; pageX: number; pageY: number } | null>(null);
-  const touchMovedRef = useRef<boolean>(false);
-  
-  // 触摸开始时立即显示提示，无需长按
   const handleTouchStart = (event: TouchEvent<HTMLCanvasElement>) => {
     const touch = event.touches[0];
     if (!touch) return;
-    
-    // 记录起始位置以检测移动
-    touchStartPosRef.current = { 
-      x: touch.clientX, 
-      y: touch.clientY, 
-      pageX: touch.pageX, 
-      pageY: touch.pageY 
+
+    // 记录起始位置并重置移动标志
+    touchStartPosRef.current = {
+      x: touch.clientX,
+      y: touch.clientY,
+      pageX: touch.pageX,
+      pageY: touch.pageY
     };
     touchMovedRef.current = false;
-    
-    // 如果是手动上色模式，立即执行上色操作
-    if (isManualColoringMode) {
-      onInteraction(touch.clientX, touch.clientY, touch.pageX, touch.pageY, true);
-    } else {
-      // 如果不是手动上色模式，触发交互以显示/隐藏提示
-      // 参数 isClick = false 仅表示这是 Tooltip 相关交互，非着色操作
-      // 实际的显示/隐藏/切换逻辑放在 page.tsx 的 handleCanvasInteraction 处理
-      onInteraction(touch.clientX, touch.clientY, touch.pageX, touch.pageY, false);
+
+    // 在非手动模式下，触摸开始时仍然可以立即显示/切换tooltip，提供即时反馈
+    if (!isManualColoringMode) {
+        onInteraction(touch.clientX, touch.clientY, touch.pageX, touch.pageY, false);
     }
+    // 注意：此处不再触发手动上色 (isClick: true)
   };
   
   // 触摸移动时检测是否需要隐藏提示
@@ -177,21 +171,30 @@ const PixelatedPreviewCanvas: React.FC<PixelatedPreviewCanvasProps> = ({
     const touch = event.touches[0];
     if (!touch || !touchStartPosRef.current) return;
     
-    // 检测触摸是否移动了足够的距离
     const dx = Math.abs(touch.clientX - touchStartPosRef.current.x);
     const dy = Math.abs(touch.clientY - touchStartPosRef.current.y);
     
-    if (dx > 5 || dy > 5) {
+    // 如果移动超过阈值，则标记为已移动，并隐藏tooltip
+    // 增加一个稍大的阈值，以更好地区分点击和微小的手指抖动/滑动意图
+    if (!touchMovedRef.current && (dx > 10 || dy > 10)) {
       touchMovedRef.current = true;
-      // 如果移动了，隐藏提示
+      // 一旦确定是移动，就隐藏tooltip
       onInteraction(0, 0, 0, 0, false, true);
     }
   };
   
   // 触摸结束时不再自动隐藏提示框
-  const handleTouchEnd = () => {
-    // 不再隐藏提示框，让用户可以查看提示内容
-    // 只重置触摸状态
+  const handleTouchEnd = (event: TouchEvent<HTMLCanvasElement>) => {
+    // 检查是否是手动模式，并且触摸没有移动（判定为点击）
+    if (isManualColoringMode && !touchMovedRef.current && touchStartPosRef.current) {
+      // 使用触摸开始时的坐标来执行上色操作
+      const { x, y, pageX, pageY } = touchStartPosRef.current;
+      onInteraction(x, y, pageX, pageY, true); // isClick: true 表示执行上色
+    }
+    // 如果是非手动模式下的点击 (isManualColoringMode=false, touchMovedRef=false)
+    // Tooltip 的显示/隐藏切换已在 touchstart 处理，touchend 时无需额外操作
+
+    // 重置触摸状态
     touchStartPosRef.current = null;
     touchMovedRef.current = false;
   };
@@ -205,13 +208,13 @@ const PixelatedPreviewCanvas: React.FC<PixelatedPreviewCanvasProps> = ({
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
-      onTouchCancel={handleTouchEnd}
+      onTouchCancel={handleTouchEnd} // 添加 onTouchCancel 以处理触摸中断的情况
       className={`border border-gray-300 dark:border-gray-600 max-w-full h-auto rounded block ${
-        isManualColoringMode ? 'cursor-pointer' : 'cursor-crosshair'
+        isManualColoringMode ? 'cursor-pointer' : 'cursor-grab' // 改为 grab 光标提示可以拖动
       }`}
-      style={{ 
-        imageRendering: 'pixelated', 
-        touchAction: 'none' // 防止触摸时页面滚动
+      style={{
+        imageRendering: 'pixelated',
+        // touchAction: 'none' // 移除此行以允许页面滚动和缩放
       }}
     />
   );
