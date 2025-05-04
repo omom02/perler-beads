@@ -342,37 +342,6 @@ export default function Home() {
     setSimilarityThresholdInput(newSimilarity.toString());
   };
 
-   const handlePaletteChange = (event: ChangeEvent<HTMLSelectElement>) => {
-    const newKey = event.target.value as PaletteOptionKey;
-    if (paletteOptions[newKey]) {
-      setSelectedPaletteKeySet(newKey);
-      
-      // 更新自定义色板选择
-      const newSelections = presetToSelections(
-        allPaletteKeys,
-        paletteOptions[newKey]?.keys || []
-      );
-      setCustomPaletteSelections(newSelections);
-      setIsCustomPalette(false);
-      
-      setExcludedColorKeys(new Set()); // 重置排除列表
-      setRemapTrigger(prev => prev + 1); // 触发重新映射
-    } else {
-      console.warn(`Attempted to select invalid palette key: ${newKey}. Keeping current selection.`);
-    }
-    // 退出手动上色模式
-    setIsManualColoringMode(false);
-    setSelectedColor(null);
-  };
-
-  const handleSimilarityChange = (event: ChangeEvent<HTMLInputElement>) => {
-    setSimilarityThreshold(parseInt(event.target.value, 10));
-    setRemapTrigger(prev => prev + 1); // Trigger full remap
-    // ++ Exit manual coloring mode if parameters change ++
-    setIsManualColoringMode(false);
-    setSelectedColor(null);
-  };
-
   // 添加像素化模式切换处理函数
   const handlePixelationModeChange = (event: ChangeEvent<HTMLSelectElement>) => {
     const newMode = event.target.value as PixelationMode;
