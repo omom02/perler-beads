@@ -213,7 +213,7 @@ export default function Home() {
       setCustomPaletteSelections(initialSelections);
       setIsCustomPalette(false);
     }
-  }, []);
+  }, [selectedPaletteKeySet]); // Add selectedPaletteKeySet to the dependency array
 
   // 更新 activeBeadPalette 基于自定义选择和排除列表
   useEffect(() => {

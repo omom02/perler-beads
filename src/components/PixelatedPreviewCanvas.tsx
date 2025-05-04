@@ -184,7 +184,7 @@ const PixelatedPreviewCanvas: React.FC<PixelatedPreviewCanvasProps> = ({
   };
   
   // 触摸结束时不再自动隐藏提示框
-  const handleTouchEnd = (event: TouchEvent<HTMLCanvasElement>) => {
+  const handleTouchEnd = () => {
     // 检查是否是手动模式，并且触摸没有移动（判定为点击）
     if (isManualColoringMode && !touchMovedRef.current && touchStartPosRef.current) {
       // 使用触摸开始时的坐标来执行上色操作
