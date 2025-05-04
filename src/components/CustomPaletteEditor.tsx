@@ -36,6 +36,8 @@ interface CustomPaletteEditorProps {
   onSaveCustomPalette: () => void;
   onClose: () => void;
   paletteOptions: Record<string, { name: string; keys: string[] }>;
+  onExportCustomPalette: () => void;
+  onImportCustomPalette: () => void;
 }
 
 const CustomPaletteEditor: React.FC<CustomPaletteEditorProps> = ({
@@ -45,7 +47,9 @@ const CustomPaletteEditor: React.FC<CustomPaletteEditorProps> = ({
   onApplyPreset,
   onSaveCustomPalette,
   onClose,
-  paletteOptions
+  paletteOptions,
+  onExportCustomPalette,
+  onImportCustomPalette,
 }) => {
   // 用于跟踪当前展开的颜色组
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
@@ -91,7 +95,7 @@ const CustomPaletteEditor: React.FC<CustomPaletteEditorProps> = ({
   };
   
   return (
-    <div className="flex flex-col h-full max-h-[80vh]">
+    <div className="flex flex-col h-full max-h-[calc(90vh-80px)]">
       {/* 头部 */}
       <div className="flex justify-between items-center border-b dark:border-gray-700 pb-3 mb-3">
         <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 flex items-center">
@@ -158,7 +162,7 @@ const CustomPaletteEditor: React.FC<CustomPaletteEditorProps> = ({
       </div>
       
       {/* 快捷操作按钮 */}
-      <div className="flex flex-wrap gap-2 mb-4">
+      <div className="flex flex-wrap gap-2 mb-4 items-center">
         <button
           onClick={() => toggleAllColors(true)}
           className="px-3 py-1.5 text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 rounded-md hover:bg-green-200 dark:hover:bg-green-900/50"
@@ -170,6 +174,24 @@ const CustomPaletteEditor: React.FC<CustomPaletteEditorProps> = ({
           className="px-3 py-1.5 text-xs bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 rounded-md hover:bg-red-200 dark:hover:bg-red-900/50"
         >
           全不选
+        </button>
+        <button
+          onClick={onImportCustomPalette}
+          className="px-3 py-1.5 text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 rounded-md hover:bg-blue-200 dark:hover:bg-blue-900/50 flex items-center gap-1"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+          </svg>
+          导入配置
+        </button>
+        <button
+          onClick={onExportCustomPalette}
+          className="px-3 py-1.5 text-xs bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300 rounded-md hover:bg-purple-200 dark:hover:bg-purple-900/50 flex items-center gap-1"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          导出配置
         </button>
       </div>
       

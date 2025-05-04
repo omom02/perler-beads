@@ -157,7 +157,9 @@ export default function Home() {
   const originalCanvasRef = useRef<HTMLCanvasElement>(null);
   const pixelatedCanvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  // const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // ++ 添加: Ref for import file input ++
+  const importPaletteInputRef = useRef<HTMLInputElement>(null);
+  //const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
   // ++ Re-add touch refs needed for tooltip logic ++
   //const touchStartPosRef = useRef<{ x: number; y: number; pageX: number; pageY: number } | null>(null);
   //const touchMovedRef = useRef<boolean>(false);
@@ -1057,9 +1059,10 @@ export default function Home() {
       paletteOptions[typedPresetKey].keys || []
     );
     setCustomPaletteSelections(newSelections);
-    setSelectedPaletteKeySet(typedPresetKey);
-    setIsCustomPalette(false);
-    setIsCustomPaletteEditorOpen(false);
+    setSelectedPaletteKeySet(typedPresetKey); // 同步更新预设选择状态
+    setIsCustomPalette(false); // 应用预设后，标记为非自定义（除非用户再次修改）
+    // 不要在这里关闭编辑器，让用户可以继续编辑
+    // setIsCustomPaletteEditorOpen(false);
   };
 
   // 保存自定义色板并应用
@@ -1072,6 +1075,89 @@ export default function Home() {
     // 退出手动上色模式
     setIsManualColoringMode(false);
     setSelectedColor(null);
+  };
+
+  // ++ 新增：导出自定义色板配置 ++
+  const handleExportCustomPalette = () => {
+    const selectedKeys = Object.entries(customPaletteSelections)
+      .filter(([, isSelected]) => isSelected)
+      .map(([key]) => key);
+
+    if (selectedKeys.length === 0) {
+      alert("当前没有选中的颜色，无法导出。");
+      return;
+    }
+
+    const blob = new Blob([JSON.stringify({ selectedKeys }, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'custom-perler-palette.json';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  // ++ 新增：处理导入的色板文件 ++
+  const handleImportPaletteFile = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string;
+        const data = JSON.parse(content);
+
+        if (!data || !Array.isArray(data.selectedKeys)) {
+          throw new Error("无效的文件格式：缺少 'selectedKeys' 数组。");
+        }
+
+        const importedKeys = data.selectedKeys as string[];
+        const validKeys = new Set(allPaletteKeys);
+        const validImportedKeys = importedKeys.filter(key => validKeys.has(key));
+        const invalidKeys = importedKeys.filter(key => !validKeys.has(key));
+
+        if (invalidKeys.length > 0) {
+          console.warn("导入时发现无效的颜色key:", invalidKeys);
+          alert(`导入完成，但以下色号无效已被忽略：\n${invalidKeys.join(', ')}`);
+        }
+
+        if (validImportedKeys.length === 0) {
+          alert("导入的文件中不包含任何有效的色号。");
+          return;
+        }
+
+        // 基于有效导入的key创建新的selections对象
+        const newSelections = presetToSelections(allPaletteKeys, validImportedKeys);
+        setCustomPaletteSelections(newSelections);
+        setIsCustomPalette(true); // 标记为自定义
+        alert(`成功导入 ${validImportedKeys.length} 个色号！`);
+
+      } catch (error) {
+        console.error("导入色板配置失败:", error);
+        alert(`导入失败: ${error instanceof Error ? error.message : '未知错误'}`);
+      } finally {
+        // 重置文件输入，以便可以再次导入相同的文件
+        if (event.target) {
+          event.target.value = '';
+        }
+      }
+    };
+    reader.onerror = () => {
+      alert("读取文件失败。");
+       // 重置文件输入
+      if (event.target) {
+        event.target.value = '';
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  // ++ 新增：触发导入文件选择 ++
+  const triggerImportPalette = () => {
+    importPaletteInputRef.current?.click();
   };
 
   return (
@@ -1321,8 +1407,16 @@ export default function Home() {
             {/* 自定义色板编辑器弹窗 - 这是新增的部分 */}
             {isCustomPaletteEditorOpen && (
               <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 flex justify-center items-center p-4">
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
-                  <div className="p-4 sm:p-6">
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+                   {/* 添加隐藏的文件输入框 */}
+                   <input
+                    type="file"
+                    accept=".json"
+                    ref={importPaletteInputRef}
+                    onChange={handleImportPaletteFile}
+                    className="hidden"
+                  />
+                  <div className="p-4 sm:p-6 flex-1 overflow-y-auto"> {/* 让内容区域可滚动 */}
                     <CustomPaletteEditor
                       allColors={fullBeadPalette}
                       currentSelections={customPaletteSelections}
@@ -1331,6 +1425,9 @@ export default function Home() {
                       onSaveCustomPalette={handleSaveCustomPalette}
                       onClose={() => setIsCustomPaletteEditorOpen(false)}
                       paletteOptions={paletteOptions}
+                      // ++ 传递新的处理函数 ++
+                      onExportCustomPalette={handleExportCustomPalette}
+                      onImportCustomPalette={triggerImportPalette}
                     />
                   </div>
                 </div>
