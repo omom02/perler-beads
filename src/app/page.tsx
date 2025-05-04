@@ -138,6 +138,7 @@ export default function Home() {
       return fullBeadPalette.filter(color => keySet.has(color.key));
   });
   const [excludedColorKeys, setExcludedColorKeys] = useState<Set<string>>(new Set());
+  const [showExcludedColors, setShowExcludedColors] = useState<boolean>(false);
   const [initialGridColorKeys, setInitialGridColorKeys] = useState<Set<string> | null>(null);
   const [mappedPixelData, setMappedPixelData] = useState<MappedPixel[][] | null>(null);
   const [gridDimensions, setGridDimensions] = useState<{ N: number; M: number } | null>(null);
@@ -1456,7 +1457,7 @@ export default function Home() {
         {/* ++ HIDE Color Counts in manual mode ++ */}
         {!isManualColoringMode && originalImageSrc && colorCounts && Object.keys(colorCounts).length > 0 && (
           // Apply dark mode styles to color counts container
-          <div className="w-full md:max-w-2xl mt-6 bg-white dark:bg-gray-800 p-4 rounded-lg shadow border border-gray-100 dark:border-gray-700">
+          <div className="w-full md:max-w-2xl mt-6 bg-white dark:bg-gray-800 p-4 rounded-lg shadow border border-gray-100 dark:border-gray-700 color-stats-panel">
             {/* Title color */}
             <h3 className="text-lg font-semibold mb-1 text-gray-700 dark:text-gray-200 text-center">
               去除杂色 
@@ -1499,22 +1500,81 @@ export default function Home() {
                 })}
             </ul>
             {excludedColorKeys.size > 0 && (
-                // Apply dark mode styles to the "restore all" button
-                <button
-                    onClick={() => {
-                      // 清空排除的颜色
-                      setExcludedColorKeys(new Set());
-                      // 触发重新映射
-                      setRemapTrigger(prev => prev + 1);
-                      // 退出手动上色模式
-                      setIsManualColoringMode(false);
-                      setSelectedColor(null);
-                      console.log("Restored all excluded colors");
-                    }}
-                    className="mt-3 w-full text-xs py-1.5 px-2 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors"
-                >
-                    恢复所有排除的颜色 ({excludedColorKeys.size})
-                </button>
+                <div className="mt-3">
+                  <button
+                    onClick={() => setShowExcludedColors(prev => !prev)}
+                    className="w-full text-xs py-1.5 px-2 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors flex items-center justify-between"
+                  >
+                    <span>已排除的颜色 ({excludedColorKeys.size})</span>
+                    <svg 
+                      xmlns="http://www.w3.org/2000/svg" 
+                      className={`h-4 w-4 text-gray-500 dark:text-gray-400 transform transition-transform ${showExcludedColors ? 'rotate-180' : ''}`}
+                      fill="none" 
+                      viewBox="0 0 24 24" 
+                      stroke="currentColor"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  
+                  {showExcludedColors && (
+                    <div className="mt-2 border border-gray-200 dark:border-gray-700 rounded-md p-2 bg-gray-100 dark:bg-gray-800">
+                      <div className="max-h-40 overflow-y-auto">
+                        {Array.from(excludedColorKeys).length > 0 ? (
+                          <ul className="space-y-1">
+                            {Array.from(excludedColorKeys).sort(sortColorKeys).map(key => {
+                              const colorData = fullBeadPalette.find(color => color.key === key);
+                              return (
+                                <li key={key} className="flex justify-between items-center p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded">
+                                  <div className="flex items-center space-x-2">
+                                    <span
+                                      className="inline-block w-4 h-4 rounded border border-gray-400 dark:border-gray-500 flex-shrink-0"
+                                      style={{ backgroundColor: colorData?.hex || '#666666' }}
+                                    ></span>
+                                    <span className="font-mono text-xs text-gray-800 dark:text-gray-200">{key}</span>
+                                  </div>
+                                  <button
+                                    onClick={() => {
+                                      // 实现恢复单个颜色的逻辑
+                                      const newExcludedKeys = new Set(excludedColorKeys);
+                                      newExcludedKeys.delete(key);
+                                      setExcludedColorKeys(newExcludedKeys);
+                                      setRemapTrigger(prev => prev + 1);
+                                      setIsManualColoringMode(false);
+                                      setSelectedColor(null);
+                                      console.log(`Restored color: ${key}`);
+                                    }}
+                                    className="text-xs py-0.5 px-2 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-800/40"
+                                  >
+                                    恢复
+                                  </button>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        ) : (
+                          <p className="text-xs text-center text-gray-500 dark:text-gray-400 py-2">
+                            没有排除的颜色
+                          </p>
+                        )}
+                      </div>
+                      
+                      <button
+                        onClick={() => {
+                          // 恢复所有颜色的逻辑
+                          setExcludedColorKeys(new Set());
+                          setRemapTrigger(prev => prev + 1);
+                          setIsManualColoringMode(false);
+                          setSelectedColor(null);
+                          console.log("Restored all excluded colors");
+                        }}
+                        className="mt-2 w-full text-xs py-1 px-2 bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors"
+                      >
+                        一键恢复所有颜色
+                      </button>
+                    </div>
+                  )}
+                </div>
             )}
           </div>
         )} {/* ++ End of HIDE Color Counts ++ */}
@@ -1523,23 +1583,23 @@ export default function Home() {
          {!isManualColoringMode && originalImageSrc && activeBeadPalette.length === 0 && excludedColorKeys.size > 0 && (
              // Apply dark mode styles to the warning box
              <div className="w-full md:max-w-2xl mt-6 bg-yellow-100 dark:bg-yellow-900/50 p-4 rounded-lg shadow border border-yellow-200 dark:border-yellow-800/60 text-center text-sm text-yellow-800 dark:text-yellow-300">
-                 当前可用颜色过少或为空。请在上方统计列表中点击恢复部分颜色，或更换色板。
+                 当前可用颜色过少或为空。请在上方统计列表中查看已排除的颜色并恢复部分，或更换色板。
                  {excludedColorKeys.size > 0 && (
                       // Apply dark mode styles to the inline "restore all" button
                       <button
                           onClick={() => {
-                            // 清空排除的颜色
-                            setExcludedColorKeys(new Set());
-                            // 触发重新映射
-                            setRemapTrigger(prev => prev + 1);
-                            // 退出手动上色模式
-                            setIsManualColoringMode(false);
-                            setSelectedColor(null);
-                            console.log("Restored all excluded colors");
+                            setShowExcludedColors(true); // 展开排除颜色列表
+                            // 滚动到颜色列表处
+                            setTimeout(() => {
+                              const listElement = document.querySelector('.color-stats-panel');
+                              if (listElement) {
+                                listElement.scrollIntoView({ behavior: 'smooth' });
+                              }
+                            }, 100);
                           }}
                           className="mt-2 ml-2 text-xs py-1 px-2 bg-yellow-200 dark:bg-yellow-700/60 text-yellow-900 dark:text-yellow-200 rounded hover:bg-yellow-300 dark:hover:bg-yellow-600/70 transition-colors"
                       >
-                          恢复所有 ({excludedColorKeys.size})
+                          查看已排除颜色 ({excludedColorKeys.size})
                       </button>
                   )}
              </div>
