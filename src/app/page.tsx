@@ -663,27 +663,59 @@ export default function Home() {
         }
         const { N, M } = gridDimensions;
         const downloadCellSize = 30;
-        const downloadWidth = N * downloadCellSize; const downloadHeight = M * downloadCellSize;
+        const axisLabelSize = 20; // Space for axis labels
+        const gridLineColor = '#DDDDDD'; // Light grid lines
+        const thickGridLineColor = '#AAAAAA'; // Thicker grid lines
+        const gridInterval = 10; // For thicker grid lines (e.g., 10x10)
+
+        // Adjust canvas size to include axis labels
+        const downloadWidth = N * downloadCellSize + axisLabelSize;
+        const downloadHeight = M * downloadCellSize + axisLabelSize;
+
         const downloadCanvas = document.createElement('canvas');
-        downloadCanvas.width = downloadWidth; downloadCanvas.height = downloadHeight;
+        downloadCanvas.width = downloadWidth;
+        downloadCanvas.height = downloadHeight;
         const ctx = downloadCanvas.getContext('2d');
         if (!ctx) { console.error("下载失败: 无法创建临时 Canvas Context。"); alert("无法下载图纸。"); return; }
         ctx.imageSmoothingEnabled = false;
 
-        // Set a default background color for the entire canvas (usually white for downloads)
+        // Set a default background color for the entire canvas
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(0, 0, downloadWidth, downloadHeight);
 
         console.log(`Generating download grid image: ${downloadWidth}x${downloadHeight}`);
         const fontSize = Math.max(8, Math.floor(downloadCellSize * 0.4));
-        ctx.font = `bold ${fontSize}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.lineWidth = 1; // Set line width for borders
+        ctx.font = `bold ${fontSize}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        // Draw Axis Labels (Numbers)
+        ctx.fillStyle = '#333333'; // Text color for axis labels
+        const axisFontSize = Math.max(10, Math.floor(axisLabelSize * 0.6));
+        ctx.font = `${axisFontSize}px sans-serif`;
+
+        // Top axis (X-axis numbers)
+        for (let i = 0; i < N; i++) {
+            if ((i + 1) % gridInterval === 0 || i === 0 || i === N -1) { // Label at intervals, and first/last
+                ctx.fillText((i + 1).toString(), axisLabelSize + (i * downloadCellSize) + (downloadCellSize / 2), axisLabelSize / 2);
+            }
+        }
+        // Left axis (Y-axis numbers)
+        for (let j = 0; j < M; j++) {
+            if ((j + 1) % gridInterval === 0 || j === 0 || j === M-1 ) { // Label at intervals, and first/last
+                 ctx.fillText((j + 1).toString(), axisLabelSize / 2, axisLabelSize + (j * downloadCellSize) + (downloadCellSize / 2));
+            }
+        }
+        // Reset font for cell keys
+        ctx.font = `bold ${fontSize}px sans-serif`;
+
 
         for (let j = 0; j < M; j++) {
             for (let i = 0; i < N; i++) {
                 const cellData = mappedPixelData[j][i];
-                const drawX = i * downloadCellSize;
-                const drawY = j * downloadCellSize;
+                // Offset drawing by axisLabelSize
+                const drawX = i * downloadCellSize + axisLabelSize;
+                const drawY = j * downloadCellSize + axisLabelSize;
 
                 // Determine fill color based on whether it's external background
                 if (cellData && !cellData.isExternal) {
@@ -704,12 +736,24 @@ export default function Home() {
                     ctx.fillRect(drawX, drawY, downloadCellSize, downloadCellSize);
                 }
 
-                // ++ Draw border for ALL cells ++
-                ctx.strokeStyle = '#DDDDDD'; // Grid line color for download
+                // Draw border for ALL cells
+                // Determine grid line color
+                ctx.strokeStyle = ((i + 1) % gridInterval === 0 || (j + 1) % gridInterval === 0) && (i < N && j < M)
+                    ? thickGridLineColor
+                    : gridLineColor;
+                ctx.lineWidth = ((i + 1) % gridInterval === 0 || (j + 1) % gridInterval === 0) ? 1.5 : 1;
+                
                 // Use precise coordinates for sharp lines
                 ctx.strokeRect(drawX + 0.5, drawY + 0.5, downloadCellSize, downloadCellSize);
             }
         }
+
+        // Draw main border around the grid area
+        ctx.strokeStyle = '#000000'; // Black border for the main grid
+        ctx.lineWidth = 1;
+        ctx.strokeRect(axisLabelSize + 0.5, axisLabelSize + 0.5, N * downloadCellSize, M * downloadCellSize);
+
+
         try {
             const dataURL = downloadCanvas.toDataURL('image/png');
             const link = document.createElement('a');
