@@ -133,7 +133,7 @@ export function downloadImage({
       const statsTopMargin = 24; // 与下方渲染时保持一致
       
       // 根据可用宽度动态计算列数
-      let numColumns = Math.max(1, Math.min(4, Math.floor(preCalcAvailableWidth / 250)));
+      const numColumns = Math.max(1, Math.min(4, Math.floor(preCalcAvailableWidth / 250)));
       
       // 根据可用宽度动态计算样式参数，使用更积极的线性缩放
       const baseSwatchSize = 18; // 略微增大基础大小
@@ -144,7 +144,7 @@ export function downloadImage({
       // widthFactor 在前面已经计算了，这里不需要重复
       const swatchSize = Math.floor(baseSwatchSize + (widthFactor * 20)); // 增大最大增量幅度
       // statsFontSize 在前面已经计算了，这里不需要重复
-      const itemPadding = Math.floor(baseItemPadding + (widthFactor * 12)); // 增大最大增量幅度
+      // const itemPadding = Math.floor(baseItemPadding + (widthFactor * 12)); // 增大最大增量幅度 // 移除未使用的 itemPadding
       
       // 计算实际需要的行数
       const numRows = Math.ceil(colorKeys.length / numColumns);
@@ -183,7 +183,7 @@ export function downloadImage({
     ctx.fillRect(0, 0, downloadWidth, downloadHeight);
   
     // 绘制标题栏背景
-    const gradientHeight = titleBarHeight;
+    // const gradientHeight = titleBarHeight; // 移除未使用的 gradientHeight
     const gradient = ctx.createLinearGradient(0, 0, downloadWidth, 0); // 水平渐变更美观
     gradient.addColorStop(0, '#4F46E5'); // 靛蓝色 (indigo-600)
     gradient.addColorStop(0.5, '#7C3AED'); // 紫色 (violet-600)
@@ -413,7 +413,7 @@ export function downloadImage({
       // widthFactor 在前面已经计算了，这里不需要重复
       const swatchSize = Math.floor(baseSwatchSize + (widthFactor * 20)); // 增大最大增量幅度
       // statsFontSize 在前面已经计算了，这里不需要重复
-      const itemPadding = Math.floor(baseItemPadding + (widthFactor * 12)); // 增大最大增量幅度
+      // const itemPadding = Math.floor(baseItemPadding + (widthFactor * 12)); // 增大最大增量幅度 // 移除未使用的 itemPadding
       
       // 计算每个项目所占的宽度
       const itemWidth = Math.floor(availableStatsWidth / renderNumColumns);
@@ -472,7 +472,7 @@ export function downloadImage({
           ctx.fillText(countText, downloadWidth - statsPadding, rowY);
         } else {
           // 多列时，在每个单元格右侧偏内绘制
-          ctx.fillText(countText, itemX + itemWidth - itemPadding, rowY);
+          ctx.fillText(countText, itemX + itemWidth - 10, rowY);
         }
       });
       

@@ -35,15 +35,6 @@ const floatAnimation = `
   }
 `;
 
-// Helper function to get contrasting text color (simple version) - 保留原有实现，因为未在utils中导出
-function getContrastColor(hex: string): string {
-    const rgb = hexToRgb(hex);
-    if (!rgb) return '#000000'; // Default to black
-    // Simple brightness check (Luma formula Y = 0.2126 R + 0.7152 G + 0.0722 B)
-    const luma = (0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b) / 255;
-    return luma > 0.5 ? '#000000' : '#FFFFFF'; // Dark background -> white text, Light background -> black text
-}
-
 // Helper function for sorting color keys - 保留原有实现，因为未在utils中导出
 function sortColorKeys(a: string, b: string): number {
   const regex = /^([A-Z]+)(\d+)$/;
@@ -683,40 +674,6 @@ export default function Home() {
           activeBeadPalette,
           selectedPaletteKeySet
         });
-    };
-
-    // --- Download Stats Image function (ensure filename includes palette) ---
-    const handleDownloadStatsImage = () => {
-        if (!colorCounts || Object.keys(colorCounts).length === 0 || activeBeadPalette.length === 0) {
-            console.error("下载统计图失败: 颜色统计数据无效或色板为空。"); alert("无法下载统计图，数据未生成、无效或无可用颜色。"); return;
-        }
-        const sortedKeys = Object.keys(colorCounts).sort(sortColorKeys);
-        const rowHeight = 25; const padding = 10; const swatchSize = 18;
-        const textOffsetY = rowHeight / 2; const column1X = padding; const column2X = padding + swatchSize + 10;
-        const canvasWidth = 250; const canvasHeight = (sortedKeys.length * rowHeight) + (2 * padding);
-        const canvas = document.createElement('canvas');
-        canvas.width = canvasWidth; canvas.height = canvasHeight;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) { console.error("下载失败: 无法创建 Canvas Context。"); alert("无法生成统计图。"); return; }
-        ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-        ctx.font = '13px sans-serif'; ctx.textBaseline = 'middle';
-
-        sortedKeys.forEach((key, index) => {
-            const yPos = padding + (index * rowHeight); const cellData = colorCounts[key];
-            ctx.fillStyle = cellData.color; ctx.strokeStyle = '#CCCCCC'; ctx.lineWidth = 1;
-            ctx.fillRect(column1X, yPos + (rowHeight - swatchSize) / 2, swatchSize, swatchSize);
-            ctx.strokeRect(column1X + 0.5, yPos + (rowHeight - swatchSize) / 2 + 0.5, swatchSize-1, swatchSize-1);
-            ctx.fillStyle = '#333333'; ctx.textAlign = 'left'; ctx.fillText(key, column2X, yPos + textOffsetY);
-            ctx.textAlign = 'right'; ctx.fillText(`${cellData.count} 颗`, canvasWidth - padding, yPos + textOffsetY);
-        });
-        try {
-            const dataURL = canvas.toDataURL('image/png');
-            const link = document.createElement('a');
-            link.download = `bead-stats-palette_${selectedPaletteKeySet}.png`; // Filename includes palette
-            link.href = dataURL;
-            document.body.appendChild(link); link.click(); document.body.removeChild(link);
-            console.log("Statistics image download initiated.");
-        } catch (e) { console.error("下载统计图失败:", e); alert("无法生成统计图下载链接。"); }
     };
 
     // --- Handler to toggle color exclusion ---
