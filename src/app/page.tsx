@@ -16,6 +16,11 @@ import {
   findClosestPaletteColor
 } from '../utils/pixelation';
 
+// 导入新的类型和组件
+import { GridDownloadOptions } from '../types/downloadTypes';
+import DownloadSettingsModal, { gridLineColorOptions } from '../components/DownloadSettingsModal';
+import { downloadImage } from '../utils/imageDownloader';
+
 import beadPaletteData from './beadPaletteData.json';
 
 // 添加自定义动画样式
@@ -121,24 +126,6 @@ import GridTooltip from '../components/GridTooltip';
 import CustomPaletteEditor from '../components/CustomPaletteEditor';
 import { loadPaletteSelections, savePaletteSelections, presetToSelections, PaletteSelections } from '../utils/localStorageUtils';
 
-// ++ 添加/定义网格下载选项类型 ++
-type GridDownloadOptions = {
-  showGrid: boolean;
-  gridInterval: number;
-  showCoordinates: boolean;
-  gridLineColor: string; // 新增网格线颜色字段
-};
-
-// ++ 定义可选的网格线颜色 ++
-const gridLineColorOptions = [
-  { name: '深灰色', value: '#555555' },
-  { name: '红色', value: '#FF0000' },
-  { name: '蓝色', value: '#0000FF' },
-  { name: '绿色', value: '#008000' },
-  { name: '紫色', value: '#800080' },
-  { name: '橙色', value: '#FFA500' },
-];
-
 export default function Home() {
   const [originalImageSrc, setOriginalImageSrc] = useState<string | null>(null);
   const [granularity, setGranularity] = useState<number>(50);
@@ -178,7 +165,8 @@ export default function Home() {
     showGrid: true,
     gridInterval: 10,
     showCoordinates: true,
-    gridLineColor: gridLineColorOptions[0].value, // 默认使用第一个颜色
+    gridLineColor: gridLineColorOptions[0].value,
+    includeStats: true // 默认包含统计信息
   });
 
   const originalCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -684,136 +672,17 @@ export default function Home() {
   }, [originalImageSrc, granularity, similarityThreshold, customPaletteSelections, pixelationMode, remapTrigger]);
 
     // --- Download function (ensure filename includes palette) ---
-    const handleDownloadImage = (options?: GridDownloadOptions) => {
-        if (!mappedPixelData || !gridDimensions || gridDimensions.N === 0 || gridDimensions.M === 0 || activeBeadPalette.length === 0) {
-            console.error("下载失败: 映射数据或尺寸无效。"); alert("无法下载图纸，数据未生成或无效。"); return;
-        }
-        const { N, M } = gridDimensions;
-        const downloadCellSize = 30;
-        
-        // 使用传入的options或者当前的downloadOptions
-        const currentOptions = options || downloadOptions;
-        
-        // 根据当前下载选项确定是否需要绘制网格和坐标
-        const { showGrid, gridInterval, showCoordinates, gridLineColor } = currentOptions;
-        
-        // 设置边距空间用于坐标轴标注（如果需要）
-        const axisLabelSize = showCoordinates ? 20 : 0;
-        // const gridLineColor = '#555555'; // 深色网格线 - 由 downloadOptions.gridLineColor 替代
-        
-        // 调整画布大小
-        const downloadWidth = N * downloadCellSize + axisLabelSize;
-        const downloadHeight = M * downloadCellSize + axisLabelSize;
-
-        const downloadCanvas = document.createElement('canvas');
-        downloadCanvas.width = downloadWidth;
-        downloadCanvas.height = downloadHeight;
-        const ctx = downloadCanvas.getContext('2d');
-        if (!ctx) { console.error("下载失败: 无法创建临时 Canvas Context。"); alert("无法下载图纸。"); return; }
-        ctx.imageSmoothingEnabled = false;
-
-        // 设置背景色
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(0, 0, downloadWidth, downloadHeight);
-
-        console.log(`Generating download grid image: ${downloadWidth}x${downloadHeight}`);
-        const fontSize = Math.max(8, Math.floor(downloadCellSize * 0.4));
-        ctx.font = `bold ${fontSize}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-
-        // 如果需要，绘制坐标轴数字
-        if (showCoordinates) {
-            ctx.fillStyle = '#333333'; // 坐标数字颜色
-            const axisFontSize = Math.max(10, Math.floor(axisLabelSize * 0.6));
-            ctx.font = `${axisFontSize}px sans-serif`;
-
-            // X轴（顶部）数字
-            for (let i = 0; i < N; i++) {
-                if ((i + 1) % gridInterval === 0 || i === 0 || i === N - 1) { // 在间隔处、起始处和结束处标注
-                    ctx.fillText((i + 1).toString(), axisLabelSize + (i * downloadCellSize) + (downloadCellSize / 2), axisLabelSize / 2);
-                }
-            }
-            // Y轴（左侧）数字
-            for (let j = 0; j < M; j++) {
-                if ((j + 1) % gridInterval === 0 || j === 0 || j === M - 1) { // 在间隔处、起始处和结束处标注
-                    ctx.fillText((j + 1).toString(), axisLabelSize / 2, axisLabelSize + (j * downloadCellSize) + (downloadCellSize / 2));
-                }
-            }
-            
-            // 重设字体以绘制单元格内的内容
-            ctx.font = `bold ${fontSize}px sans-serif`;
-        }
-
-        // 绘制所有单元格
-        for (let j = 0; j < M; j++) {
-            for (let i = 0; i < N; i++) {
-                const cellData = mappedPixelData[j][i];
-                // 由于坐标轴的存在，需要偏移绘制位置
-                const drawX = i * downloadCellSize + axisLabelSize;
-                const drawY = j * downloadCellSize + axisLabelSize;
-
-                // 根据是否是外部背景确定填充颜色
-                if (cellData && !cellData.isExternal) {
-                    // 内部单元格：使用珠子颜色填充并绘制文本
-                    const cellColor = cellData.color || '#FFFFFF';
-                    const cellKey = cellData.key || '?';
-
-                    ctx.fillStyle = cellColor;
-                    ctx.fillRect(drawX, drawY, downloadCellSize, downloadCellSize);
-
-                    ctx.fillStyle = getContrastColor(cellColor);
-                    ctx.fillText(cellKey, drawX + downloadCellSize / 2, drawY + downloadCellSize / 2);
-                } else {
-                    // 外部背景：填充白色
-                    ctx.fillStyle = '#FFFFFF';
-                    ctx.fillRect(drawX, drawY, downloadCellSize, downloadCellSize);
-                }
-
-                // 绘制所有单元格的边框
-                ctx.strokeStyle = '#DDDDDD'; // 浅色线条作为基础网格
-                ctx.lineWidth = 0.5;
-                ctx.strokeRect(drawX + 0.5, drawY + 0.5, downloadCellSize, downloadCellSize);
-            }
-        }
-
-        // 如果需要，绘制分隔网格线
-        if (showGrid) {
-            ctx.strokeStyle = gridLineColor; // 使用用户选择的颜色
-            ctx.lineWidth = 1.5;
-            
-            // 绘制垂直分隔线 - 在单元格之间而不是边框上
-            for (let i = gridInterval; i < N; i += gridInterval) {
-                const lineX = i * downloadCellSize + axisLabelSize;
-                ctx.beginPath();
-                ctx.moveTo(lineX, axisLabelSize);
-                ctx.lineTo(lineX, axisLabelSize + M * downloadCellSize);
-                ctx.stroke();
-            }
-            
-            // 绘制水平分隔线 - 在单元格之间而不是边框上
-            for (let j = gridInterval; j < M; j += gridInterval) {
-                const lineY = j * downloadCellSize + axisLabelSize;
-                ctx.beginPath();
-                ctx.moveTo(axisLabelSize, lineY);
-                ctx.lineTo(axisLabelSize + N * downloadCellSize, lineY);
-                ctx.stroke();
-            }
-        }
-
-        // 绘制整个网格区域的主边框
-        ctx.strokeStyle = '#000000'; // 黑色边框
-        ctx.lineWidth = 1.5;
-        ctx.strokeRect(axisLabelSize + 0.5, axisLabelSize + 0.5, N * downloadCellSize, M * downloadCellSize);
-
-        try {
-            const dataURL = downloadCanvas.toDataURL('image/png');
-            const link = document.createElement('a');
-            link.download = `bead-grid-${N}x${M}-keys-palette_${selectedPaletteKeySet}.png`; // 文件名包含调色板
-            link.href = dataURL;
-            document.body.appendChild(link); link.click(); document.body.removeChild(link);
-            console.log("Grid image download initiated.");
-        } catch (e) { console.error("下载图纸失败:", e); alert("无法生成图纸下载链接。"); }
+    const handleDownloadRequest = (options?: GridDownloadOptions) => {
+        // 调用移动到utils/imageDownloader.ts中的downloadImage函数
+        downloadImage({
+          mappedPixelData,
+          gridDimensions,
+          colorCounts,
+          totalBeadCount,
+          options: options || downloadOptions,
+          activeBeadPalette,
+          selectedPaletteKeySet
+        });
     };
 
     // --- Download Stats Image function (ensure filename includes palette) ---
@@ -1254,167 +1123,6 @@ export default function Home() {
   // ++ 新增：触发导入文件选择 ++
   const triggerImportPalette = () => {
     importPaletteInputRef.current?.click();
-  };
-
-  // ++ 添加下载设置弹窗组件 ++
-  const DownloadSettingsModal = ({ 
-    isOpen, 
-    onClose, 
-    options, 
-    onOptionsChange, 
-    onDownload 
-  }: { 
-    isOpen: boolean, 
-    onClose: () => void, 
-    options: GridDownloadOptions, 
-    onOptionsChange: (options: GridDownloadOptions) => void,
-    onDownload: (opts?: GridDownloadOptions) => void // 修改onDownload类型以接受可选参数
-  }) => {
-    // 将useState移到顶层，不管isOpen是什么值
-    const [tempOptions, setTempOptions] = useState<GridDownloadOptions>({...options});
-    
-    // 如果不是打开状态，仍然可以返回null
-    if (!isOpen) return null;
-    
-    // 处理选项变更 - 使用更具体的类型而不是any
-    const handleOptionChange = (key: keyof GridDownloadOptions, value: string | number | boolean) => {
-      setTempOptions(prev => ({
-        ...prev,
-        [key]: value
-      }));
-    };
-    
-    // 保存选项并立即使用新设置下载
-    const handleSave = () => {
-      // 更新父组件中的设置状态（虽然下载时不依赖这个更新）
-      onOptionsChange(tempOptions);
-      
-      // 直接使用当前临时设置下载，不依赖状态更新
-      onDownload(tempOptions); 
-      
-      onClose();
-    };
-    
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden w-full max-w-md">
-          <div className="p-5">
-            <div className="flex justify-between items-center border-b dark:border-gray-700 pb-3 mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">下载图纸设置</h3>
-              <button 
-                onClick={onClose}
-                className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                </svg>
-              </button>
-            </div>
-            
-            <div className="space-y-4">
-              {/* 显示网格线选项 */}
-              <div className="flex items-center justify-between">
-                <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300">
-                  显示网格线
-                </label>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    className="sr-only peer"
-                    checked={tempOptions.showGrid}
-                    onChange={(e) => handleOptionChange('showGrid', e.target.checked)}
-                  />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                </label>
-              </div>
-              
-              {/* 网格线设置 (仅当显示网格线时) */}
-              {tempOptions.showGrid && (
-                <div className="space-y-4 pl-2 border-l-2 border-gray-200 dark:border-gray-700 ml-1 pt-2 pb-1">
-                  {/* 网格线间隔选项 */}
-                  <div className="flex flex-col space-y-2">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      网格线间隔 (每 N 格画一条线)
-                    </label>
-                    <div className="flex items-center justify-between space-x-3">
-                      <input 
-                        type="range" 
-                        min="5" 
-                        max="20" 
-                        step="1"
-                        value={tempOptions.gridInterval}
-                        onChange={(e) => handleOptionChange('gridInterval', parseInt(e.target.value))}
-                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
-                      />
-                      <span className="flex items-center justify-center min-w-[40px] text-sm font-medium text-gray-900 dark:text-gray-100">
-                        {tempOptions.gridInterval}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* 网格线颜色选择 */}
-                  <div className="flex flex-col space-y-2">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      网格线颜色
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      {gridLineColorOptions.map(colorOpt => (
-                        <button
-                          key={colorOpt.value}
-                          type="button"
-                          onClick={() => handleOptionChange('gridLineColor', colorOpt.value)}
-                          className={`w-8 h-8 rounded-full border-2 transition-all duration-150 flex items-center justify-center 
-                                      ${tempOptions.gridLineColor === colorOpt.value 
-                                        ? 'border-blue-500 ring-2 ring-blue-500 ring-offset-1 dark:ring-offset-gray-800' 
-                                        : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'}`}
-                          title={colorOpt.name}
-                        >
-                          <span 
-                            className="block w-6 h-6 rounded-full"
-                            style={{ backgroundColor: colorOpt.value }}
-                          ></span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              {/* 显示坐标选项 */}
-              <div className="flex items-center justify-between">
-                <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300">
-                  显示坐标数字
-                </label>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    className="sr-only peer"
-                    checked={tempOptions.showCoordinates}
-                    onChange={(e) => handleOptionChange('showCoordinates', e.target.checked)}
-                  />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                </label>
-              </div>
-            </div>
-            
-            <div className="flex justify-end mt-6 space-x-3">
-              <button
-                onClick={onClose}
-                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-lg transition-colors"
-              >
-                取消
-              </button>
-              <button
-                onClick={handleSave}
-                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
-              >
-                下载图纸
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
   };
 
   return (
@@ -1948,24 +1656,15 @@ export default function Home() {
 
         {/* ++ HIDE Download Buttons in manual mode ++ */}
         {!isManualColoringMode && originalImageSrc && mappedPixelData && (
-            <div className="w-full md:max-w-2xl mt-4 flex flex-col sm:flex-row gap-2 sm:gap-3">
-              {/* Download Grid Button - 现在打开设置弹窗而不是直接下载 */}
+            <div className="w-full md:max-w-2xl mt-4">
+              {/* 使用一个大按钮，现在所有的下载设置都通过弹窗控制 */}
               <button
                 onClick={() => setIsDownloadSettingsOpen(true)}
                 disabled={!mappedPixelData || !gridDimensions || gridDimensions.N === 0 || gridDimensions.M === 0 || activeBeadPalette.length === 0}
-                className="flex-1 py-2.5 px-4 bg-gradient-to-r from-green-500 to-green-600 text-white text-sm sm:text-base rounded-lg hover:from-green-600 hover:to-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg hover:translate-y-[-1px] disabled:hover:translate-y-0 disabled:hover:shadow-md"
+                className="w-full py-2.5 px-4 bg-gradient-to-r from-green-500 to-green-600 text-white text-sm sm:text-base rounded-lg hover:from-green-600 hover:to-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg hover:translate-y-[-1px] disabled:hover:translate-y-0 disabled:hover:shadow-md"
                >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                下载图纸 (带色号)
-              </button>
-              {/* Download Stats Button - Keeping styles bright */}
-              <button
-                onClick={handleDownloadStatsImage}
-                disabled={!colorCounts || totalBeadCount === 0 || activeBeadPalette.length === 0}
-                className="flex-1 py-2.5 px-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white text-sm sm:text-base rounded-lg hover:from-purple-600 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg hover:translate-y-[-1px] disabled:hover:translate-y-0 disabled:hover:shadow-md"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                下载数量表 (PNG)
+                下载拼豆图纸
               </button>
             </div>
         )} {/* ++ End of HIDE Download Buttons ++ */}
@@ -2072,13 +1771,13 @@ export default function Home() {
         </div>
       )}
 
-      {/* 添加下载设置弹窗 */}
+      {/* 使用导入的下载设置弹窗组件 */}
       <DownloadSettingsModal 
         isOpen={isDownloadSettingsOpen}
         onClose={() => setIsDownloadSettingsOpen(false)}
         options={downloadOptions}
         onOptionsChange={setDownloadOptions}
-        onDownload={handleDownloadImage}
+        onDownload={handleDownloadRequest}
       />
     </div>
    </>
