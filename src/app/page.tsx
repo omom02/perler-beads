@@ -1270,13 +1270,14 @@ export default function Home() {
     onOptionsChange: (options: GridDownloadOptions) => void,
     onDownload: (opts?: GridDownloadOptions) => void // 修改onDownload类型以接受可选参数
   }) => {
-    if (!isOpen) return null;
-    
-    // 临时状态用于表单输入
+    // 将useState移到顶层，不管isOpen是什么值
     const [tempOptions, setTempOptions] = useState<GridDownloadOptions>({...options});
     
-    // 处理选项变更
-    const handleOptionChange = (key: keyof GridDownloadOptions, value: any) => {
+    // 如果不是打开状态，仍然可以返回null
+    if (!isOpen) return null;
+    
+    // 处理选项变更 - 使用更具体的类型而不是any
+    const handleOptionChange = (key: keyof GridDownloadOptions, value: string | number | boolean) => {
       setTempOptions(prev => ({
         ...prev,
         [key]: value
