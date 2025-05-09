@@ -138,7 +138,7 @@ export function downloadImage({
       // 根据可用宽度动态计算样式参数，使用更积极的线性缩放
       const baseSwatchSize = 18; // 略微增大基础大小
       // baseStatsFontSize 和 statsFontSize 在前面已经计算了，这里不需要重复
-      const baseItemPadding = 10;
+      // const baseItemPadding = 10;
       
       // 调整缩放公式，使大宽度更明显增大
       // widthFactor 在前面已经计算了，这里不需要重复
@@ -407,7 +407,7 @@ export function downloadImage({
       // 根据可用宽度动态计算样式参数，使用更积极的线性缩放
       const baseSwatchSize = 18; // 略微增大基础大小
       // baseStatsFontSize 和 statsFontSize 在前面已经计算了，这里不需要重复
-      const baseItemPadding = 10;
+      // const baseItemPadding = 10;
       
       // 调整缩放公式，使大宽度更明显增大
       // widthFactor 在前面已经计算了，这里不需要重复
