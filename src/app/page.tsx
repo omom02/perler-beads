@@ -16,11 +16,6 @@ import {
   findClosestPaletteColor
 } from '../utils/pixelation';
 
-// 导入新的类型和组件
-import { GridDownloadOptions } from '../types/downloadTypes';
-import DownloadSettingsModal, { gridLineColorOptions } from '../components/DownloadSettingsModal';
-import { downloadImage } from '../utils/imageDownloader';
-
 import beadPaletteData from './beadPaletteData.json';
 
 // 添加自定义动画样式
@@ -34,6 +29,15 @@ const floatAnimation = `
     animation: float 3s ease-in-out infinite;
   }
 `;
+
+// Helper function to get contrasting text color (simple version) - 保留原有实现，因为未在utils中导出
+function getContrastColor(hex: string): string {
+    const rgb = hexToRgb(hex);
+    if (!rgb) return '#000000'; // Default to black
+    // Simple brightness check (Luma formula Y = 0.2126 R + 0.7152 G + 0.0722 B)
+    const luma = (0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b) / 255;
+    return luma > 0.5 ? '#000000' : '#FFFFFF'; // Dark background -> white text, Light background -> black text
+}
 
 // Helper function for sorting color keys - 保留原有实现，因为未在utils中导出
 function sortColorKeys(a: string, b: string): number {
@@ -149,16 +153,7 @@ export default function Home() {
   const [customPaletteSelections, setCustomPaletteSelections] = useState<PaletteSelections>({});
   const [isCustomPaletteEditorOpen, setIsCustomPaletteEditorOpen] = useState<boolean>(false);
   const [isCustomPalette, setIsCustomPalette] = useState<boolean>(false);
-  
-  // ++ 新增：下载设置相关状态 ++
-  const [isDownloadSettingsOpen, setIsDownloadSettingsOpen] = useState<boolean>(false);
-  const [downloadOptions, setDownloadOptions] = useState<GridDownloadOptions>({
-    showGrid: true,
-    gridInterval: 10,
-    showCoordinates: true,
-    gridLineColor: gridLineColorOptions[0].value,
-    includeStats: true // 默认包含统计信息
-  });
+  const [originalImageWidth, setOriginalImageWidth] = useState<number | null>(null); // 新增：存储图片宽度
 
   const originalCanvasRef = useRef<HTMLCanvasElement>(null);
   const pixelatedCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -273,10 +268,17 @@ export default function Home() {
       setTotalBeadCount(0);
       setInitialGridColorKeys(null); // ++ 重置初始键 ++
       // ++ 重置横轴格子数量为默认值 ++
-      const defaultGranularity = 100;
+      const defaultGranularity = 16;
       setGranularity(defaultGranularity);
       setGranularityInput(defaultGranularity.toString());
       setRemapTrigger(prev => prev + 1); // Trigger full remap for new image
+
+      // 新增：读取图片宽度
+      const img = new window.Image();
+      img.onload = () => {
+        setOriginalImageWidth(img.width);
+      };
+      img.src = result;
     };
     reader.onerror = () => {
         console.error("文件读取失败");
@@ -369,28 +371,34 @@ export default function Home() {
     const originalCanvas = originalCanvasRef.current;
     const pixelatedCanvas = pixelatedCanvasRef.current;
 
-    if (!originalCanvas || !pixelatedCanvas) { console.error("Canvas ref(s) not available."); return; }
+    if (!originalCanvas || !pixelatedCanvas) { 
+        console.error("Canvas ref(s) not available."); 
+        return; 
+    }
+
     const originalCtx = originalCanvas.getContext('2d', { willReadFrequently: true });
     const pixelatedCtx = pixelatedCanvas.getContext('2d');
-    if (!originalCtx || !pixelatedCtx) { console.error("Canvas context(s) not found."); return; }
+    if (!originalCtx || !pixelatedCtx) { 
+        console.error("Canvas context(s) not found."); 
+        return; 
+    }
     console.log("Canvas contexts obtained.");
 
     if (currentPalette.length === 0) {
         console.error("Cannot pixelate: The selected color palette is empty (likely due to exclusions).");
         alert("错误：当前可用颜色板为空（可能所有颜色都被排除了），无法处理图像。请尝试恢复部分颜色。");
-        // Clear previous results visually
         pixelatedCtx.clearRect(0, 0, pixelatedCanvas.width, pixelatedCanvas.height);
         setMappedPixelData(null);
         setGridDimensions(null);
-        // Keep colorCounts potentially showing the last valid counts? Or clear them too?
-        // setColorCounts(null); // Decide if clearing counts is desired when palette is empty
-        // setTotalBeadCount(0);
-        return; // Stop processing
+        return;
     }
-    const t1FallbackColor = currentPalette.find(p => p.key === 'T1')
-                         || currentPalette.find(p => p.hex.toUpperCase() === '#FFFFFF')
-                         || currentPalette[0]; // 使用第一个可用颜色作为备用
-    console.log("Using fallback color for empty cells:", t1FallbackColor);
+
+    // 获取 H1 色号作为透明背景的替代色
+    const h1Color = currentPalette.find(p => p.key === 'H1');
+    if (!h1Color) {
+        console.warn("H1 color not found in palette, using first available color as fallback");
+    }
+    const transparentFallbackColor = h1Color || currentPalette[0];
 
     const img = new window.Image();
     
@@ -405,33 +413,61 @@ export default function Home() {
     };
     
     img.onload = () => {
+      // 再次检查 canvas refs 是否仍然有效
+      const currentOriginalCanvas = originalCanvasRef.current;
+      const currentPixelatedCanvas = pixelatedCanvasRef.current;
+      
+      if (!currentOriginalCanvas || !currentPixelatedCanvas) {
+        console.error("Canvas refs became invalid during image loading");
+        return;
+      }
+
       console.log("Image loaded successfully.");
       const aspectRatio = img.height / img.width;
       const N = detailLevel;
       const M = Math.max(1, Math.round(N * aspectRatio));
-      if (N <= 0 || M <= 0) { console.error("Invalid grid dimensions:", { N, M }); return; }
+      if (N <= 0 || M <= 0) { 
+        console.error("Invalid grid dimensions:", { N, M }); 
+        return; 
+      }
       console.log(`Grid size: ${N}x${M}`);
 
       const outputWidth = 500;
       const outputHeight = Math.round(outputWidth * aspectRatio);
-      originalCanvas.width = img.width; originalCanvas.height = img.height;
-      pixelatedCanvas.width = outputWidth; pixelatedCanvas.height = outputHeight;
+      currentOriginalCanvas.width = img.width; 
+      currentOriginalCanvas.height = img.height;
+      currentPixelatedCanvas.width = outputWidth; 
+      currentPixelatedCanvas.height = outputHeight;
       console.log(`Canvas dimensions: Original ${img.width}x${img.height}, Output ${outputWidth}x${outputHeight}`);
 
-      originalCtx.drawImage(img, 0, 0, img.width, img.height);
+      // 获取新的上下文
+      const currentOriginalCtx = currentOriginalCanvas.getContext('2d', { willReadFrequently: true });
+      const currentPixelatedCtx = currentPixelatedCanvas.getContext('2d');
+      
+      if (!currentOriginalCtx || !currentPixelatedCtx) {
+        console.error("Failed to get canvas contexts after image load");
+        return;
+      }
+
+      // 清空画布并设置白色背景
+      currentOriginalCtx.fillStyle = '#FFFFFF';
+      currentOriginalCtx.fillRect(0, 0, img.width, img.height);
+      
+      // 绘制图片
+      currentOriginalCtx.drawImage(img, 0, 0, img.width, img.height);
       console.log("Original image drawn.");
 
       // 1. 使用calculatePixelGrid进行初始颜色映射
       console.log("Starting initial color mapping using calculatePixelGrid...");
       const initialMappedData = calculatePixelGrid(
-          originalCtx,
+          currentOriginalCtx,
           img.width,
           img.height,
           N,
           M,
           currentPalette, 
           mode,
-          t1FallbackColor
+          transparentFallbackColor
       );
       console.log(`Initial data mapping complete using mode ${mode}. Starting global color merging...`);
 
@@ -539,7 +575,6 @@ export default function Home() {
       console.log("Global color merging complete. Starting background removal.");
 
       // --- Flood Fill Background Process ---
-      // ... 保持洪水填充算法不变，但在mergedData上操作 ...
       const visitedForFloodFill: boolean[][] = Array(M).fill(null).map(() => Array(N).fill(false));
 
       // 将递归的floodFill改为迭代实现，使用队列避免栈溢出
@@ -597,30 +632,26 @@ export default function Home() {
       console.log("Background flood fill marking complete.");
 
       // --- 绘制和状态更新 ---
-      if (pixelatedCanvasRef.current) {
-        setMappedPixelData(mergedData);
-        setGridDimensions({ N, M });
+      setMappedPixelData(mergedData);
+      setGridDimensions({ N, M });
 
-        const counts: { [key: string]: { count: number; color: string } } = {};
-        let totalCount = 0;
-        mergedData.flat().forEach(cell => {
-          if (cell && cell.key && !cell.isExternal) {
-            if (!counts[cell.key]) {
-              counts[cell.key] = { count: 0, color: cell.color };
-            }
-            counts[cell.key].count++;
-            totalCount++;
+      const counts: { [key: string]: { count: number; color: string } } = {};
+      let totalCount = 0;
+      mergedData.flat().forEach(cell => {
+        if (cell && cell.key && !cell.isExternal) {
+          if (!counts[cell.key]) {
+            counts[cell.key] = { count: 0, color: cell.color };
           }
-        });
-        setColorCounts(counts);
-        setTotalBeadCount(totalCount);
-        setInitialGridColorKeys(new Set(Object.keys(counts)));
-        console.log("Color counts updated based on merged data (excluding external background):", counts);
-        console.log("Total bead count (excluding background):", totalCount);
-        console.log("Stored initial grid color keys:", Object.keys(counts));
-      } else {
-        console.error("Pixelated canvas ref is null, skipping draw call in pixelateImage.");
-      }
+          counts[cell.key].count++;
+          totalCount++;
+        }
+      });
+      setColorCounts(counts);
+      setTotalBeadCount(totalCount);
+      setInitialGridColorKeys(new Set(Object.keys(counts)));
+      console.log("Color counts updated based on merged data (excluding external background):", counts);
+      console.log("Total bead count (excluding background):", totalCount);
+      console.log("Stored initial grid color keys:", Object.keys(counts));
     }; // 正确闭合 img.onload 函数
     
     console.log("Setting image source...");
@@ -663,17 +694,214 @@ export default function Home() {
   }, [originalImageSrc, granularity, similarityThreshold, customPaletteSelections, pixelationMode, remapTrigger]);
 
     // --- Download function (ensure filename includes palette) ---
-    const handleDownloadRequest = (options?: GridDownloadOptions) => {
-        // 调用移动到utils/imageDownloader.ts中的downloadImage函数
-        downloadImage({
-          mappedPixelData,
-          gridDimensions,
-          colorCounts,
-          totalBeadCount,
-          options: options || downloadOptions,
-          activeBeadPalette,
-          selectedPaletteKeySet
+    const handleDownloadImage = () => {
+        if (!mappedPixelData || !gridDimensions || gridDimensions.N === 0 || gridDimensions.M === 0 || activeBeadPalette.length === 0) {
+            console.error("下载失败: 映射数据或尺寸无效。"); 
+            alert("无法下载图纸，数据未生成或无效。"); 
+            return;
+        }
+        const { N, M } = gridDimensions;
+        const downloadCellSize = 30;
+        const downloadWidth = N * downloadCellSize; 
+        const downloadHeight = M * downloadCellSize;
+
+        // 计算统计区域的高度
+        const sortedKeys = Object.keys(colorCounts || {}).sort(sortColorKeys);
+        const statsRowHeight = 22;
+        const statsPadding = 15;
+        const statsColumns = 3;
+        const rowsPerColumn = Math.ceil(sortedKeys.length / statsColumns);
+        const statsHeight = (rowsPerColumn * statsRowHeight) + (2 * statsPadding) + 50; // 增加标题下方间距
+
+        // 创建包含统计区域的画布
+        const downloadCanvas = document.createElement('canvas');
+        downloadCanvas.width = downloadWidth;
+        downloadCanvas.height = downloadHeight + statsHeight;
+        const ctx = downloadCanvas.getContext('2d');
+        if (!ctx) { 
+            console.error("下载失败: 无法创建临时 Canvas Context。"); 
+            alert("无法下载图纸。"); 
+            return; 
+        }
+        ctx.imageSmoothingEnabled = false;
+
+        // 设置白色背景
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, downloadWidth, downloadHeight + statsHeight);
+
+        // 绘制图纸部分
+        console.log(`Generating download grid image: ${downloadWidth}x${downloadHeight}`);
+        const fontSize = Math.max(8, Math.floor(downloadCellSize * 0.4));
+        ctx.font = `bold ${fontSize}px sans-serif`; 
+        ctx.textAlign = 'center'; 
+        ctx.textBaseline = 'middle';
+        ctx.lineWidth = 1;
+
+        // 绘制所有单元格和浅色网格线
+        for (let j = 0; j < M; j++) {
+            for (let i = 0; i < N; i++) {
+                const cellData = mappedPixelData[j][i];
+                const drawX = i * downloadCellSize;
+                const drawY = j * downloadCellSize;
+
+                if (cellData && !cellData.isExternal) {
+                    const cellColor = cellData.color || '#FFFFFF';
+                    const cellKey = cellData.key || '?';
+
+                    ctx.fillStyle = cellColor;
+                    ctx.fillRect(drawX, drawY, downloadCellSize, downloadCellSize);
+
+                    ctx.fillStyle = getContrastColor(cellColor);
+                    ctx.fillText(cellKey, drawX + downloadCellSize / 2, drawY + downloadCellSize / 2);
+                } else {
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.fillRect(drawX, drawY, downloadCellSize, downloadCellSize);
+                }
+
+                ctx.strokeStyle = '#DDDDDD';
+                ctx.strokeRect(drawX + 0.5, drawY + 0.5, downloadCellSize, downloadCellSize);
+            }
+        }
+
+        // 绘制深色边界线
+        ctx.strokeStyle = '#161824';
+        ctx.lineWidth = 2.0;
+
+        // 绘制横向深色线
+        for (let j = 0; j <= M; j += 5) {
+            const y = j * downloadCellSize;
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(downloadWidth, y);
+            ctx.stroke();
+        }
+
+        // 绘制纵向深色线
+        for (let i = 0; i <= N; i += 5) {
+            const x = i * downloadCellSize;
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, downloadHeight);
+            ctx.stroke();
+        }
+
+        // 绘制分隔线
+        ctx.strokeStyle = '#161824';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, downloadHeight);
+        ctx.lineTo(downloadWidth, downloadHeight);
+        ctx.stroke();
+
+        // 绘制统计区域
+        ctx.font = 'bold 16px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#333333';
+        ctx.fillText('拼豆数量统计', downloadWidth / 2, downloadHeight + 30);
+
+        // 设置统计区域的字体
+        ctx.font = '13px sans-serif';
+        ctx.textBaseline = 'middle';
+
+        // 计算列宽
+        const columnWidth = downloadWidth / statsColumns;
+        const swatchSize = 14;
+        const textOffsetX = swatchSize + 6;
+        const countOffsetX = columnWidth - 40;
+
+        // 绘制统计内容
+        sortedKeys.forEach((key, index) => {
+            const column = Math.floor(index / rowsPerColumn);
+            const row = index % rowsPerColumn;
+            const cellData = colorCounts?.[key];
+            if (!cellData) return;
+
+            const x = column * columnWidth + statsPadding;
+            const y = downloadHeight + 55 + (row * statsRowHeight); // 增加与标题的间距
+
+            // 绘制圆角颜色样本
+            const radius = 3;
+            ctx.fillStyle = cellData.color;
+            ctx.beginPath();
+            ctx.moveTo(x + radius, y - swatchSize/2);
+            ctx.lineTo(x + swatchSize - radius, y - swatchSize/2);
+            ctx.quadraticCurveTo(x + swatchSize, y - swatchSize/2, x + swatchSize, y - swatchSize/2 + radius);
+            ctx.lineTo(x + swatchSize, y + swatchSize/2 - radius);
+            ctx.quadraticCurveTo(x + swatchSize, y + swatchSize/2, x + swatchSize - radius, y + swatchSize/2);
+            ctx.lineTo(x + radius, y + swatchSize/2);
+            ctx.quadraticCurveTo(x, y + swatchSize/2, x, y + swatchSize/2 - radius);
+            ctx.lineTo(x, y - swatchSize/2 + radius);
+            ctx.quadraticCurveTo(x, y - swatchSize/2, x + radius, y - swatchSize/2);
+            ctx.closePath();
+            ctx.fill();
+
+            // 绘制色号
+            ctx.fillStyle = '#333333';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle'; // 确保文字垂直居中对齐
+            ctx.fillText(key, x + textOffsetX, y);
+
+            // 绘制数量
+            ctx.textAlign = 'right';
+            ctx.fillText(`${cellData.count} 颗`, x + countOffsetX, y);
         });
+        const getFormattedDateTime = (): string => {
+          const now = new Date();
+          return [
+            now.getFullYear() + '年',
+            String(now.getMonth() + 1).padStart(2, '0') + '月',
+            String(now.getDate()).padStart(2, '0') + '日',
+            String(now.getHours()).padStart(2, '0') + '时',
+            String(now.getMinutes()).padStart(2, '0') + '分'
+          ].join('');
+        };
+        try {
+            const dataURL = downloadCanvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.download = `${getFormattedDateTime()} 导出的${N}x${M}拼豆图纸.png`;
+            link.href = dataURL;
+            document.body.appendChild(link); 
+            link.click(); 
+            document.body.removeChild(link);
+            console.log("Grid image download initiated.");
+        } catch (e) { 
+            console.error("下载图纸失败:", e); 
+            alert("无法生成图纸下载链接。"); 
+        }
+    };
+
+    // --- Download Stats Image function (ensure filename includes palette) ---
+    const handleDownloadStatsImage = () => {
+        if (!colorCounts || Object.keys(colorCounts).length === 0 || activeBeadPalette.length === 0) {
+            console.error("下载统计图失败: 颜色统计数据无效或色板为空。"); alert("无法下载统计图，数据未生成、无效或无可用颜色。"); return;
+        }
+        const sortedKeys = Object.keys(colorCounts).sort(sortColorKeys);
+        const rowHeight = 25; const padding = 10; const swatchSize = 18;
+        const textOffsetY = rowHeight / 2; const column1X = padding; const column2X = padding + swatchSize + 10;
+        const canvasWidth = 250; const canvasHeight = (sortedKeys.length * rowHeight) + (2 * padding);
+        const canvas = document.createElement('canvas');
+        canvas.width = canvasWidth; canvas.height = canvasHeight;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { console.error("下载失败: 无法创建 Canvas Context。"); alert("无法生成统计图。"); return; }
+        ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+        ctx.font = '13px sans-serif'; ctx.textBaseline = 'middle';
+
+        sortedKeys.forEach((key, index) => {
+            const yPos = padding + (index * rowHeight); const cellData = colorCounts[key];
+            ctx.fillStyle = cellData.color; ctx.strokeStyle = '#CCCCCC'; ctx.lineWidth = 1;
+            ctx.fillRect(column1X, yPos + (rowHeight - swatchSize) / 2, swatchSize, swatchSize);
+            ctx.strokeRect(column1X + 0.5, yPos + (rowHeight - swatchSize) / 2 + 0.5, swatchSize-1, swatchSize-1);
+            ctx.fillStyle = '#333333'; ctx.textAlign = 'left'; ctx.fillText(key, column2X, yPos + textOffsetY);
+            ctx.textAlign = 'right'; ctx.fillText(`${cellData.count} 颗`, canvasWidth - padding, yPos + textOffsetY);
+        });
+        try {
+            const dataURL = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.download = `色号图.png`; // Filename includes palette
+            link.href = dataURL;
+            document.body.appendChild(link); link.click(); document.body.removeChild(link);
+            console.log("Statistics image download initiated.");
+        } catch (e) { console.error("下载统计图失败:", e); alert("无法生成统计图下载链接。"); }
     };
 
     // --- Handler to toggle color exclusion ---
@@ -1171,8 +1399,17 @@ export default function Home() {
           </div>
 
           {/* Title gradient might need adjustment, but let's keep it for now */}
-          <h1 className="text-2xl sm:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-purple-500 to-pink-500 tracking-tight drop-shadow-sm">
-          七卡瓦 拼豆底稿生成器
+          <h1
+            className="text-2xl sm:text-4xl font-bold tracking-tight drop-shadow-sm"
+            style={{
+              background: 'linear-gradient(to right, #2563eb, #a21caf, #ec4899)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+              color: 'transparent'
+            }}
+          >
+            拼豆底稿生成器
           </h1>
           {/* Separator gradient remains the same */}
           <div className="h-1 w-24 mx-auto my-3 bg-gradient-to-r from-blue-500 to-pink-500 rounded-full"></div>
@@ -1197,6 +1434,30 @@ export default function Home() {
                 <path d="M512 64C264.6 64 64 264.6 64 512s200.6 448 448 448 448-200.6 448-448S759.4 64 512 64z m238.8 360.2l-57.7 93.3c-10.1 16.3-31.5 21.3-47.8 11.2l-112.4-69.5c-16.3-10.1-21.3-31.5-11.2-47.8l57.7-93.3c10.1-16.3 31.5-21.3 47.8-11.2l112.4 69.5c16.3 10.1 21.3 31.5 11.2 47.8zM448 496l-57.7 93.3c-10.1 16.3-31.5 21.3-47.8 11.2l-112.4-69.5c-16.3-10.1-21.3-31.5-11.2-47.8l57.7-93.3c10.1-16.3 31.5-21.3 47.8-11.2l112.4 69.5c16.3 10.1 21.3 31.5 11.2 47.8z m248.9 43.2l-57.7 93.3c-10.1 16.3-31.5 21.3-47.8 11.2l-112.4-69.5c-16.3-10.1-21.3-31.5-11.2-47.8l57.7-93.3c10.1-16.3 31.5-21.3 47.8-11.2l112.4 69.5c16.3 10.1 21.3 31.5 11.2 47.8z"/>
               </svg>
               小红书
+            </a>
+            <a 
+              href="/pixel_draw/index.html"  // 暂时用占位符，替换为实际链接
+              target="_blank"
+              className="text-xs text-green-500 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 transition-colors duration-200 hover:underline flex items-center justify-center"
+            >
+              <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                width="14" 
+                height="14" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+                className="mr-0.5"
+              >
+                <rect width="7" height="7" x="3" y="3" rx="1"/>
+                <rect width="7" height="7" x="14" y="3" rx="1"/>
+                <rect width="7" height="7" x="14" y="14" rx="1"/>
+                <rect width="7" height="7" x="3" y="14" rx="1"/>
+              </svg>
+              像素画工具
             </a>
           </div>
         </div>
@@ -1246,6 +1507,12 @@ export default function Home() {
               <div className="w-full md:max-w-2xl grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white dark:bg-gray-800 p-4 sm:p-5 rounded-xl shadow-md border border-gray-100 dark:border-gray-700">
                 {/* Granularity Input */}
                 <div className="flex-1">
+                  {/* 新增：显示图片宽度 */}
+                  {originalImageWidth !== null && (
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1.5 sm:mb-2">
+                      图片原始宽度：<span className="font-mono font-semibold text-blue-600 dark:text-blue-300">{originalImageWidth}px</span>
+                    </div>
+                  )}
                   {/* Label color */}
                   <label htmlFor="granularityInput" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 sm:mb-2">
                     横轴切割数量 (10-200):
@@ -1266,6 +1533,10 @@ export default function Home() {
 
                 {/* Similarity Threshold Input */}
                 <div className="flex-1">
+                    {/* 添加空行 */}
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1.5 sm:mb-2">
+                      &nbsp;
+                    </div>
                     {/* Label color */}
                     <label htmlFor="similarityThresholdInput" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 sm:mb-2">
                         颜色合并阈值 (0-100):
@@ -1613,15 +1884,24 @@ export default function Home() {
 
         {/* ++ HIDE Download Buttons in manual mode ++ */}
         {!isManualColoringMode && originalImageSrc && mappedPixelData && (
-            <div className="w-full md:max-w-2xl mt-4">
-              {/* 使用一个大按钮，现在所有的下载设置都通过弹窗控制 */}
+            <div className="w-full md:max-w-2xl mt-4 flex flex-col sm:flex-row gap-2 sm:gap-3">
+              {/* Download Grid Button - Keeping styles bright */}
               <button
-                onClick={() => setIsDownloadSettingsOpen(true)}
+                onClick={handleDownloadImage}
                 disabled={!mappedPixelData || !gridDimensions || gridDimensions.N === 0 || gridDimensions.M === 0 || activeBeadPalette.length === 0}
-                className="w-full py-2.5 px-4 bg-gradient-to-r from-green-500 to-green-600 text-white text-sm sm:text-base rounded-lg hover:from-green-600 hover:to-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg hover:translate-y-[-1px] disabled:hover:translate-y-0 disabled:hover:shadow-md"
+                className="flex-1 py-2.5 px-4 bg-gradient-to-r from-green-500 to-green-600 text-white text-sm sm:text-base rounded-lg hover:from-green-600 hover:to-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg hover:translate-y-[-1px] disabled:hover:translate-y-0 disabled:hover:shadow-md"
                >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                下载拼豆图纸
+                下载图纸 (带色号)
+              </button>
+              {/* Download Stats Button - Keeping styles bright */}
+              <button
+                onClick={handleDownloadStatsImage}
+                disabled={!colorCounts || totalBeadCount === 0 || activeBeadPalette.length === 0}
+                className="flex-1 py-2.5 px-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white text-sm sm:text-base rounded-lg hover:from-purple-600 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg hover:translate-y-[-1px] disabled:hover:translate-y-0 disabled:hover:shadow-md"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                下载数量表 (PNG)
               </button>
             </div>
         )} {/* ++ End of HIDE Download Buttons ++ */}
@@ -1727,15 +2007,6 @@ export default function Home() {
           </div>
         </div>
       )}
-
-      {/* 使用导入的下载设置弹窗组件 */}
-      <DownloadSettingsModal 
-        isOpen={isDownloadSettingsOpen}
-        onClose={() => setIsDownloadSettingsOpen(false)}
-        options={downloadOptions}
-        onOptionsChange={setDownloadOptions}
-        onDownload={handleDownloadRequest}
-      />
     </div>
    </>
   );
