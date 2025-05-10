@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>像素画工具</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="toolbar">
+            <div class="tool-group">
+                <button id="pencil" class="tool active" title="铅笔">✏️</button>
+                <button id="eraser" class="tool" title="橡皮擦">🧹</button>
+                <button id="bucket" class="tool" title="油漆桶">🪣</button>
+            </div>
+            <div class="tool-group">
+                <button id="save" class="tool" title="保存">💾</button>
+                <button id="load" class="tool" title="加载">📂</button>
+                <button id="export" class="tool" title="导出PNG">🖼️</button>
+            </div>
+            <div class="history-group">
+                <button id="undo" class="history-btn" title="撤销">↩️</button>
+                <button id="redo" class="history-btn" title="重做">↪️</button>
+            </div>
+            <div class="tool-group">
+                <label>
+                    画布尺寸:
+                    <input type="number" id="canvasWidth" value="16" min="1" max="100">
+                    ×
+                    <input type="number" id="canvasHeight" value="16" min="1" max="100">
+                </label>
+            </div>
+            <div class="tool-group">
+                <label>
+                    显示比例:
+                    <input type="range" id="canvasScale" min="1" max="10" value="1" step="0.5">
+                    <span id="scaleValue">2x</span>
+                </label>
+            </div>
+        </div>
+        
+        <div class="main-content">
+            <div class="palette-section">
+                <div class="custom-palette-container">
+                    <h3>当前调色板</h3>
+                    <div id="customColors" class="custom-palette"></div>
+                </div>
+                
+                <div class="color-library-container">
+                    <div class="library-header">
+                        <h3>色库</h3>
+                        <button id="toggleLibrary" class="toggle-btn">▼</button>
+                    </div>
+                    <div class="search-box">
+                        <input type="text" id="colorSearch" placeholder="搜索颜色...">
+                    </div>
+                    <div class="color-categories"></div>
+                </div>
+            </div>
+            
+            <div class="canvas-container">
+                <div class="grid-overlay"></div>
+                <canvas id="canvas"></canvas>
+                <div id="colorInfo" class="color-info"></div>
+            </div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
