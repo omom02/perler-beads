@@ -1,0 +1,269 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f0f0f0;
+    padding: 20px;
+}
+
+.container {
+    max-width: 1600px;
+    margin: 0 auto;
+    background-color: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.toolbar {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 20px;
+    padding: 10px;
+    background-color: #f8f8f8;
+    border-radius: 4px;
+}
+
+.tool-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.tool {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    background-color: white;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.tool:hover {
+    background-color: #f0f0f0;
+}
+
+.tool.active {
+    background-color: #e0e0e0;
+    border-color: #999;
+}
+
+.history-group {
+    margin-left: auto;
+    padding: 0 20px;
+}
+
+.history-btn {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    background-color: #f8f8f8;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.history-btn:hover {
+    background-color: #e0e0e0;
+}
+
+.history-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.main-content {
+    display: flex;
+    gap: 20px;
+}
+
+.palette-section {
+    width: 300px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.custom-palette-container {
+    background-color: #f8f8f8;
+    padding: 18px;
+    border-radius: 4px;
+}
+
+.custom-palette {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+    gap: 20px;
+    margin-top: 10px;
+}
+
+.color-library-container {
+    background-color: #f8f8f8;
+    padding: 15px;
+    border-radius: 4px;
+}
+
+.library-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.toggle-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 5px;
+}
+
+.search-box {
+    margin-bottom: 10px;
+}
+
+.search-box input {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.color-categories {
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+.color-category {
+    margin-bottom: 15px;
+}
+
+.category-header {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-weight: bold;
+    margin-bottom: 5px;
+    padding: 5px;
+    background-color: #e0e0e0;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.category-header .toggle-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 2px;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.category-header .toggle-btn:hover {
+    background-color: #d0d0d0;
+    border-radius: 2px;
+}
+
+.color-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+    gap: 18px 5px;
+}
+
+.color-item {
+    width: 40px;
+    height: 40px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+    position: relative;
+    transition: transform 0.2s;
+}
+
+.color-item:hover {
+    transform: scale(1.1);
+    z-index: 1;
+}
+
+.color-item.active {
+    border: 2px solid #333;
+}
+
+.color-id {
+    position: absolute;
+    bottom: -18px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-size: 10px;
+    white-space: nowrap;
+    display: block;
+}
+
+.canvas-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    overflow: auto;
+    padding: 10px;
+    min-height: 0;
+    position: relative;
+}
+
+.grid-overlay {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    pointer-events: none;
+    z-index: 1;
+}
+
+#canvas {
+    border: 1px solid #ddd;
+    background-color: white;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.color-info {
+    padding: 5px 10px;
+    background-color: #f8f8f8;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+input[type="number"] {
+    width: 60px;
+    padding: 4px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+input[type="range"] {
+    width: 100px;
+    vertical-align: middle;
+    margin: 0 5px;
+}
+
+#scaleValue {
+    display: inline-block;
+    min-width: 40px;
+    text-align: center;
+    font-weight: bold;
+}
