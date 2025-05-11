@@ -701,17 +701,21 @@ export default function Home() {
             return;
         }
         const { N, M } = gridDimensions;
-        const downloadCellSize = 30;
+        const downloadCellSize = 50;
         const downloadWidth = N * downloadCellSize; 
         const downloadHeight = M * downloadCellSize;
 
         // 计算统计区域的高度
+
         const sortedKeys = Object.keys(colorCounts || {}).sort(sortColorKeys);
-        const statsRowHeight = 22;
+        const swatchSize = downloadCellSize * 0.8;  // 颜色样本大小与画布单元格一致
+        const statsRowHeight = swatchSize + 12;  // 增加行高确保字体居中（上下各6px间距）
+        const minColumnWidth = swatchSize + 110;  // 确保列宽足够容纳样本（50px）+ 文字（至少30px）+ 间距
+        const maxPossiblePerRow = Math.floor(downloadWidth / minColumnWidth); 
+        const maxPerRow = Math.max(1, Math.min(maxPossiblePerRow, sortedKeys.length));  // 最终列数（至少1列，不超过总颜色数）
         const statsPadding = 15;
-        const statsColumns = 3;
-        const rowsPerColumn = Math.ceil(sortedKeys.length / statsColumns);
-        const statsHeight = (rowsPerColumn * statsRowHeight) + (2 * statsPadding) + 50; // 增加标题下方间距
+        const rows = Math.ceil(sortedKeys.length / maxPerRow);
+        const statsHeight = (rows * statsRowHeight) + (2 * statsPadding) + 50; // 更新高度计算
 
         // 创建包含统计区域的画布
         const downloadCanvas = document.createElement('canvas');
@@ -794,33 +798,50 @@ export default function Home() {
         ctx.stroke();
 
         // 绘制统计区域
-        ctx.font = 'bold 16px sans-serif';
+        const titleFontSize = Math.floor(downloadCellSize * 0.6); 
+        const contentFontSize = Math.floor(downloadCellSize * 0.4); // 内容字体=颜色样本高度*0.6（最小10px）
+        ctx.font = `bold ${titleFontSize}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.fillStyle = '#333333';
-        ctx.fillText('拼豆数量统计', downloadWidth / 2, downloadHeight + 30);
+        ctx.fillText('所需豆子清单', downloadWidth / 2, downloadHeight + 30);
 
         // 设置统计区域的字体
-        ctx.font = '13px sans-serif';
+        ctx.font = `${contentFontSize}px sans-serif`;
         ctx.textBaseline = 'middle';
 
         // 计算列宽
-        const columnWidth = downloadWidth / statsColumns;
-        const swatchSize = 14;
-        const textOffsetX = swatchSize + 6;
-        const countOffsetX = columnWidth - 40;
+        const columnWidth = downloadWidth / maxPerRow;
+        const textOffsetX = swatchSize + 12;
+        
+
+        const getContrastTextColor = (hexColor: string): string => {
+          // 转换十六进制颜色为RGB值（支持#RGB和#RRGGBB格式）
+          const hex = hexColor.replace(/^#/, '');
+          const r = parseInt(hex.length === 3 ? hex[0] + hex[0] : hex[0] + hex[1], 16);
+          const g = parseInt(hex.length === 3 ? hex[1] + hex[1] : hex[2] + hex[3], 16);
+          const b = parseInt(hex.length === 3 ? hex[2] + hex[2] : hex[4] + hex[5], 16);
+  
+          // 计算相对亮度（WCAG标准）
+          const gamma = (val: number) => val / 255 <= 0.03928 ? val / 255 / 12.92 : ((val / 255 + 0.055) / 1.055) ** 2.4;
+          const L = 0.2126 * gamma(r) + 0.7152 * gamma(g) + 0.0722 * gamma(b);
+          
+          return L > 0.5 ? '#000000' : '#FFFFFF';  // 亮度>0.5用黑，否则用白
+      };
 
         // 绘制统计内容
         sortedKeys.forEach((key, index) => {
-            const column = Math.floor(index / rowsPerColumn);
-            const row = index % rowsPerColumn;
-            const cellData = colorCounts?.[key];
-            if (!cellData) return;
-
-            const x = column * columnWidth + statsPadding;
-            const y = downloadHeight + 55 + (row * statsRowHeight); // 增加与标题的间距
+          const row = Math.floor(index / maxPerRow);
+          const column = index % maxPerRow;
+          const cellData = colorCounts?.[key];
+          if (!cellData) return;
+  
+          // 垂直位置计算：标题下方50px基准 + 行号*行距（优化后）
+          const y = downloadHeight + 80 + (row * statsRowHeight);
+          const columnWidth = downloadWidth / maxPerRow;
+          const x = column * columnWidth + statsPadding;
 
             // 绘制圆角颜色样本
-            const radius = 3;
+            const radius = 5;
             ctx.fillStyle = cellData.color;
             ctx.beginPath();
             ctx.moveTo(x + radius, y - swatchSize/2);
@@ -834,16 +855,29 @@ export default function Home() {
             ctx.quadraticCurveTo(x, y - swatchSize/2, x + radius, y - swatchSize/2);
             ctx.closePath();
             ctx.fill();
+            ctx.stroke();
 
             // 绘制色号
-            ctx.fillStyle = '#333333';
-            ctx.textAlign = 'left';
-            ctx.textBaseline = 'middle'; // 确保文字垂直居中对齐
-            ctx.fillText(key, x + textOffsetX, y);
+            // 计算颜色样本中心坐标（x方向中心：x + swatchSize/2，y方向中心：y）
+            const swatchCenterX = x + swatchSize / 2;
+            const swatchCenterY = y;
+
+            // 获取对比度文本颜色
+            const textColor = getContrastTextColor(cellData.color);
+            ctx.fillStyle = textColor;
+
+            // 设置文本居中对齐
+            ctx.textAlign = 'center';  // 水平居中
+            ctx.textBaseline = 'middle';  // 垂直居中
+
+            // 绘制色号在颜色样本中心
+            ctx.fillText(key, swatchCenterX, swatchCenterY + 2);
 
             // 绘制数量
-            ctx.textAlign = 'right';
-            ctx.fillText(`${cellData.count} 颗`, x + countOffsetX, y);
+            ctx.textAlign = 'left';
+            const textX = x + swatchSize + 20;
+            ctx.fillStyle = '#000000'
+            ctx.fillText(`${cellData.count} 颗`, textX, y);
         });
         const getFormattedDateTime = (): string => {
           const now = new Date();
